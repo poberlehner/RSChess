@@ -1,0 +1,16 @@
+[package]
+name = "Chess"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+raylib = "6.0.0"
+chrono = "0.4.44"
+chess_engine = { path = "../Chess_Engine" }
+
+[dev-dependencies]
+criterion = "0.8.2"
+
+[[bench]]
+name = "move_generation_bench"
+harness = false
