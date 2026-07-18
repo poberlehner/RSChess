@@ -12,15 +12,12 @@ use std::time::*;
 //Main api functions
 impl Board {
     ///returns: success
-    pub fn make_move(&mut self, m: Move) -> bool {
+    pub fn make_move(&mut self, m: Move, in_search: bool) -> bool {
         if self.game_result != GameResult::InProgress {
             println!("The game is not running");
             println!("Game Result: {:?}", self.game_result);
             return false;
         }
-
-        //TODO: Performance optimization
-        //  Flatten the squares array
 
         if self.legal_moves.is_none() {
             self.get_legal_moves();
@@ -48,10 +45,12 @@ impl Board {
             en_passant_square_before: self.game_state.en_passant_square,
             castling_rights_before: self.game_state.castling_rights,
             fifty_move_counter_before: self.game_state.fifty_move_counter,
-            moved_piece: self.squares[m.origin_square.0 as usize][m.origin_square.1 as usize].unwrap()
+            moved_piece: self.squares[m.origin_square as usize].unwrap()
         };
 
-        self.move_start_time = Instant::now();
+        if self.time_control != TimeControl::Unlimited {
+            self.move_start_time = Instant::now();
+        }
 
         let mut special_move = false;
 
@@ -64,13 +63,13 @@ impl Board {
             }
 
             //Reset on pawn move
-            if self.squares[m.origin_square.0 as usize][m.origin_square.1 as usize]
+            if self.squares[m.origin_square as usize]
                 .expect("No piece at the Origin of the Move").piece_type == PieceType::Pawn {
                 self.game_state.fifty_move_counter = 0;
             }
 
             //Reset on capture
-            if self.squares[m.destination_square.0 as usize][m.destination_square.1 as usize].is_some() {
+            if self.squares[m.destination_square as usize].is_some() {
                 self.game_state.fifty_move_counter = 0;
             }
 
@@ -88,17 +87,17 @@ impl Board {
                 if m.promotion_type == PieceType::King {
                     panic!("Promotion type is King");
                 }
-                if self.squares[m.origin_square.0 as usize][m.origin_square.1 as usize]
+                if self.squares[m.origin_square as usize]
                     .expect("No piece at the Origin of the Move").piece_type != PieceType::Pawn {
                     panic!("Non pawn piece with a promotion type other than none");
                 }
             }
 
-            current_logmove.captured_piece = self.squares[m.destination_square.0 as usize][m.destination_square.1 as usize];
-            self.squares[m.destination_square.0 as usize][m.destination_square.1 as usize] =
+            current_logmove.captured_piece = self.squares [m.destination_square as usize];
+            self.squares [m.destination_square as usize] =
                 Some(Piece { piece_type: m.promotion_type,
-                    white_piece: self.squares[m.origin_square.0 as usize][m.origin_square.1 as usize].unwrap().white_piece});
-            self.squares[m.origin_square.0 as usize][m.origin_square.1 as usize] = None;
+                    white_piece: self.squares [m.origin_square as usize].unwrap().white_piece});
+            self.squares [m.origin_square as usize] = None;
         }
         else //Special move handling
         {
@@ -109,14 +108,14 @@ impl Board {
             special_move |= self.handle_castling(m, &mut current_logmove);
 
             if !special_move {
-                current_logmove.captured_piece = self.squares[m.destination_square.0 as usize][m.destination_square.1 as usize];
+                current_logmove.captured_piece = self.squares [m.destination_square as usize];
 
-                self.squares[m.destination_square.0 as usize][m.destination_square.1 as usize] =
-                    self.squares[m.origin_square.0 as usize][m.origin_square.1 as usize];
-                self.squares[m.origin_square.0 as usize][m.origin_square.1 as usize] = None;
+                self.squares [m.destination_square as usize] =
+                    self.squares [m.origin_square as usize];
+                self.squares [m.origin_square as usize] = None;
             }
 
-            if self.squares[m.destination_square.0 as usize][m.destination_square.1 as usize].unwrap().piece_type == PieceType::King {
+            if self.squares [m.destination_square as usize].unwrap().piece_type == PieceType::King {
                 if self.game_state.white_to_move {
                     self.white_king_pos = m.destination_square;
                 }
@@ -134,7 +133,7 @@ impl Board {
 
         self.move_log.push(current_logmove);
 
-       self.handle_end_conditions(&current_logmove);
+       self.handle_end_conditions(in_search, &current_logmove);
 
         true
     }
@@ -151,7 +150,7 @@ impl Board {
         self.game_state.white_to_move = !self.game_state.white_to_move;
 
         let last = self.move_log.pop().unwrap();
-        let piece = self.squares[last.destination_square.0 as usize][last.destination_square.1 as usize].expect("Invalid logged move");
+        let piece = self.squares[last.destination_square as usize].expect("Invalid logged move");
 
         self.zobrist_history.pop();
 
@@ -167,43 +166,45 @@ impl Board {
         self.game_state.fifty_move_counter = last.fifty_move_counter_before;
 
         if last.promotion_type == PieceType::None {
-            self.squares[last.origin_square.0 as usize][last.origin_square.1 as usize] =
-                self.squares[last.destination_square.0 as usize][last.destination_square.1 as usize];
+            self.squares[last.origin_square as usize] =
+                self.squares[last.destination_square as usize];
         }
         else {
-            self.squares[last.origin_square.0 as usize][last.origin_square.1 as usize] =
+            self.squares[last.origin_square as usize] =
                 Some(Piece { white_piece: piece.white_piece, piece_type: PieceType::Pawn });
         }
 
         if !last.en_passant {
-            self.squares[last.destination_square.0 as usize][last.destination_square.1 as usize] = last.captured_piece;
+            self.squares[last.destination_square as usize] = last.captured_piece;
         }
         else {
-            self.squares[last.destination_square.0 as usize][last.destination_square.1 as usize] = None;
+            self.squares[last.destination_square as usize] = None;
 
-            self.squares[last.destination_square.0 as usize][last.origin_square.1 as usize] =
+            self.squares[(last.destination_square as i32 + if piece.white_piece { -8 } else { 8 }) as usize] =
                 Some(Piece { piece_type: PieceType::Pawn, white_piece: !piece.white_piece });
         }
 
         if last.castling {
-            if last.origin_square.1 == 7 {
-                if last.destination_square.0 == 2 {
-                    self.squares[3][7] = None;
-                    self.squares[0][7] = Some(Piece { piece_type: PieceType::Rook, white_piece: true});
+            //Black
+            if last.origin_square == 60 {
+                if last.destination_square == 62 {
+                    self.squares[61] = None;
+                    self.squares[63] = Some(Piece { piece_type: PieceType::Rook, white_piece: false});
                 }
                 else {
-                    self.squares[5][7] = None;
-                    self.squares[7][7] = Some(Piece { piece_type: PieceType::Rook, white_piece: true});
+                    self.squares[59] = None;
+                    self.squares[56] = Some(Piece { piece_type: PieceType::Rook, white_piece: false});
                 }
             }
+            //White
             else {
-                if last.destination_square.0 == 2 {
-                    self.squares[3][0] = None;
-                    self.squares[0][0] = Some(Piece { piece_type: PieceType::Rook, white_piece: false});
+                if last.destination_square == 6 {
+                    self.squares[5] = None;
+                    self.squares[7] = Some(Piece { piece_type: PieceType::Rook, white_piece: true});
                 }
                 else {
-                    self.squares[5][0] = None;
-                    self.squares[7][0] = Some(Piece { piece_type: PieceType::Rook, white_piece: false});
+                    self.squares[3] = None;
+                    self.squares[0] = Some(Piece { piece_type: PieceType::Rook, white_piece: true});
                 }
             }
         }
@@ -223,11 +224,9 @@ impl Board {
         Some(last)
     }
 
-    pub fn start_game(&mut self, full_game_end_enforcement: bool, time_control: TimeControl) {
+    pub fn start_game(&mut self, time_control: TimeControl) {
         if self.game_result != GameResult::InProgress {
             self.game_result = GameResult::InProgress;
-
-            self.full_game_end_enforcement = full_game_end_enforcement;
 
             self.time_control = time_control;
             self.white_used_time = Duration::new(0, 0);
@@ -238,6 +237,8 @@ impl Board {
     pub fn get_game_result(&self) -> GameResult { self.game_result }
 
     pub fn get_time_control(&self) -> TimeControl { self.time_control }
+
+    pub fn get_white_to_move(&self) -> bool { self.game_state.white_to_move }
 
     ///Returns 0 when time_control is unlimited
     pub fn get_time_left(&self, white: bool) -> Duration {
@@ -286,6 +287,8 @@ impl Board {
         self.black_diagonal_pin_bitboard = None;
         self.white_orthogonal_pin_bitboard = None;
         self.black_orthogonal_pin_bitboard = None;
+        self.white_en_passant_pin_bitboard = None;
+        self.black_en_passant_pin_bitboard = None;
         self.white_attacked_squares_bitboard = None;
         self.black_attacked_squares_bitboard = None;
     }
@@ -294,18 +297,18 @@ impl Board {
 //Main API helper functions
 impl Board {
     fn handle_castling(&mut self, m: Move, log_move: &mut LogMove) -> bool {
-        if self.squares[m.origin_square.0 as usize][m.origin_square.1 as usize].is_some() &&
-            self.squares[m.origin_square.0 as usize][m.origin_square.1 as usize].unwrap().piece_type == PieceType::King {
+        if self.squares[m.origin_square as usize].is_some() &&
+            self.squares[m.origin_square as usize].unwrap().piece_type == PieceType::King {
             if self.game_state.castling_rights[0] {
                 //White kingside castle
-                if  m.origin_square.0 == 4 && m.origin_square.1 == 7 &&
-                    m.destination_square.0 == 6 && m.destination_square.1 == 7 &&
-                    self.squares[5][7].is_none() && self.squares[6][7].is_none() {
+                if  m.origin_square == 4 &&
+                    m.destination_square == 6 &&
+                    self.squares[5].is_none() && self.squares[6].is_none() {
 
-                    self.squares[4][7] = None;
-                    self.squares[7][7] = None;
-                    self.squares[6][7] = Some(Piece { piece_type: PieceType::King, white_piece: true });
-                    self.squares[5][7] = Some(Piece { piece_type: PieceType::Rook, white_piece: true });
+                    self.squares[4] = None;
+                    self.squares[7] = None;
+                    self.squares[6] = Some(Piece { piece_type: PieceType::King, white_piece: true });
+                    self.squares[5] = Some(Piece { piece_type: PieceType::Rook, white_piece: true });
 
                     self.game_state.castling_rights[0] = false;
                     self.game_state.castling_rights[1] = false;
@@ -317,14 +320,14 @@ impl Board {
             }
             if self.game_state.castling_rights[1] {
                 //White queenside castle
-                if  m.origin_square.0 == 4 && m.origin_square.1 == 7 &&
-                    m.destination_square.0 == 2 && m.destination_square.1 == 7 &&
-                    self.squares[1][7].is_none() && self.squares[2][7].is_none() && self.squares[3][7].is_none() {
+                if  m.origin_square == 4 &&
+                    m.destination_square == 2 &&
+                    self.squares[1].is_none() && self.squares[2].is_none() && self.squares[3].is_none() {
 
-                    self.squares[4][7] = None;
-                    self.squares[0][7] = None;
-                    self.squares[2][7] = Some(Piece { piece_type: PieceType::King, white_piece: true });
-                    self.squares[3][7] = Some(Piece { piece_type: PieceType::Rook, white_piece: true });
+                    self.squares[4] = None;
+                    self.squares[0] = None;
+                    self.squares[2] = Some(Piece { piece_type: PieceType::King, white_piece: true });
+                    self.squares[3] = Some(Piece { piece_type: PieceType::Rook, white_piece: true });
 
                     self.game_state.castling_rights[0] = false;
                     self.game_state.castling_rights[1] = false;
@@ -336,14 +339,14 @@ impl Board {
             }
             if self.game_state.castling_rights[2] {
                 //Black kingside castle
-                if  m.origin_square.0 == 4 && m.origin_square.1 == 0 &&
-                    m.destination_square.0 == 6 && m.destination_square.1 == 0 &&
-                    self.squares[5][0].is_none() && self.squares[6][0].is_none() {
+                if  m.origin_square == 60 &&
+                    m.destination_square == 62 &&
+                    self.squares[61].is_none() && self.squares[62].is_none() {
 
-                    self.squares[4][0] = None;
-                    self.squares[7][0] = None;
-                    self.squares[6][0] = Some(Piece { piece_type: PieceType::King, white_piece: false });
-                    self.squares[5][0] = Some(Piece { piece_type: PieceType::Rook, white_piece: false });
+                    self.squares[60] = None;
+                    self.squares[63] = None;
+                    self.squares[62] = Some(Piece { piece_type: PieceType::King, white_piece: false });
+                    self.squares[61] = Some(Piece { piece_type: PieceType::Rook, white_piece: false });
 
                     self.game_state.castling_rights[2] = false;
                     self.game_state.castling_rights[3] = false;
@@ -355,14 +358,14 @@ impl Board {
             }
             if self.game_state.castling_rights[3] {
                 //Black queenside castle
-                if  m.origin_square.0 == 4 && m.origin_square.1 == 0 &&
-                    m.destination_square.0 == 2 && m.destination_square.1 == 0 &&
-                    self.squares[1][0].is_none() && self.squares[2][0].is_none() && self.squares[3][0].is_none() {
+                if  m.origin_square == 60 &&
+                    m.destination_square == 58 &&
+                    self.squares[57].is_none() && self.squares[58].is_none() && self.squares[59].is_none() {
 
-                    self.squares[4][0] = None;
-                    self.squares[0][0] = None;
-                    self.squares[2][0] = Some(Piece { piece_type: PieceType::King, white_piece: false });
-                    self.squares[3][0] = Some(Piece { piece_type: PieceType::Rook, white_piece: false });
+                    self.squares[60] = None;
+                    self.squares[56] = None;
+                    self.squares[58] = Some(Piece { piece_type: PieceType::King, white_piece: false });
+                    self.squares[59] = Some(Piece { piece_type: PieceType::Rook, white_piece: false });
 
                     log_move.castling = true;
 
@@ -375,23 +378,23 @@ impl Board {
         }
 
         //Disable castling when a Rook is moved or captured
-        if (m.destination_square.0 == 7 && m.destination_square.1 == 7) || (m.origin_square.0 == 7 && m.origin_square.1 == 7) {
+        if (m.destination_square == 7) || (m.origin_square == 7) {
             self.game_state.castling_rights[0] = false;
         }
-        if (m.destination_square.0 == 0 && m.destination_square.1 == 7) || (m.origin_square.0 == 0 && m.origin_square.1 == 7) {
+        if (m.destination_square == 0) || (m.origin_square == 0) {
             self.game_state.castling_rights[1] = false;
         }
-        if (m.destination_square.0 == 7 && m.destination_square.1 == 0) || (m.origin_square.0 == 7 && m.origin_square.1 == 0) {
+        if (m.destination_square == 63) || (m.origin_square == 63) {
             self.game_state.castling_rights[2] = false;
         }
-        if (m.destination_square.0 == 0 && m.destination_square.1 == 0) || (m.origin_square.0 == 0 && m.origin_square.1 == 0) {
+        if (m.destination_square == 56) || (m.origin_square == 56) {
             self.game_state.castling_rights[3] = false;
         }
-        if m.origin_square.0 == 4 && m.origin_square.1 == 7 {
+        if m.origin_square == 4 {
             self.game_state.castling_rights[0] = false;
             self.game_state.castling_rights[1] = false;
         }
-        if m.origin_square.0 == 4 && m.origin_square.1 == 0 {
+        if m.origin_square == 60 {
             self.game_state.castling_rights[2] = false;
             self.game_state.castling_rights[3] = false;
         }
@@ -400,19 +403,22 @@ impl Board {
     }
 
     fn handle_en_passant(&mut self, m: Move, log_move: &mut LogMove) -> bool {
-        if self.squares[m.origin_square.0 as usize][m.origin_square.1 as usize].is_some() &&
-            self.squares[m.origin_square.0 as usize][m.origin_square.1 as usize].unwrap().piece_type == PieceType::Pawn {
-            if m.origin_square.1.abs_diff(m.destination_square.1) == 2 {
-                self.game_state.en_passant_square = Some((m.origin_square.0, (m.destination_square.1 + m.origin_square.1) / 2));
+        if self.squares[m.origin_square as usize].is_some() &&
+            self.squares[m.origin_square as usize].unwrap().piece_type == PieceType::Pawn {
+
+            if m.origin_square.abs_diff(m.destination_square) == 16 {
+                self.game_state.en_passant_square = Some(if log_move.moved_piece.white_piece { m.origin_square + 8 } else { m.origin_square - 8 });
 
                 return false;
             }
 
+            //If en passant is played
             if self.game_state.en_passant_square.is_some() && m.destination_square == self.game_state.en_passant_square.unwrap() {
-                self.squares[self.game_state.en_passant_square.unwrap().0 as usize][m.origin_square.1 as usize] = None;
-                self.squares[m.destination_square.0 as usize][m.destination_square.1 as usize] =
+                self.squares[(self.game_state.en_passant_square.unwrap() as i32 + if log_move.moved_piece.white_piece { -8i32 } else { 8 }) as usize] = None;
+
+                self.squares[m.destination_square as usize] =
                     Some(Piece { piece_type: PieceType::Pawn, white_piece: self.game_state.white_to_move });
-                self.squares[m.origin_square.0 as usize][m.origin_square.1 as usize] = None;
+                self.squares[m.origin_square as usize] = None;
                 self.game_state.en_passant_square = None;
 
                 log_move.en_passant = true;
@@ -420,6 +426,7 @@ impl Board {
                 return true;
             }
         }
+
 
         self.game_state.en_passant_square = None;
 
@@ -430,7 +437,7 @@ impl Board {
 ///Handle End conditions
 impl Board {
     #[allow(unused)]
-    fn handle_end_conditions(&mut self, logmove: &LogMove) {
+    fn handle_end_conditions(&mut self, in_search: bool,  logmove: &LogMove) {
         // let red = "\x1b[31m";      // Red text
         // let green = "\x1b[32m";    // Green text
         // let yellow = "\x1b[33m";   // Yellow text
@@ -443,7 +450,7 @@ impl Board {
         if self.checkmate() {
             if self.game_state.white_to_move {
                 self.game_result = GameResult::WhiteIsMated;
-                if self.full_game_end_enforcement {
+                if !in_search {
                     println!("{blue}White Is Mated{reset}");
                     trace_log(LOG_INFO, "White Is Mated");
                 }
@@ -452,7 +459,7 @@ impl Board {
             }
             else {
                 self.game_result = GameResult::BlackIsMated;
-                if self.full_game_end_enforcement {
+                if !in_search {
                     println!("{blue}Black Is Mated{reset}");
                     trace_log(LOG_INFO, "Black Is Mated");
                 }
@@ -461,7 +468,7 @@ impl Board {
             }
         }
 
-        if self.full_game_end_enforcement {
+        if !in_search {
             if self.game_state.fifty_move_counter == 50 {
                 self.game_result = GameResult::FiftyMoveRule;
                 println!("{blue}Draw by the fifty-move rule{reset}");
@@ -508,30 +515,28 @@ impl Board {
         let mut knight_num: i32 = 0;
         let mut opp_pieces: i32 = 0;
 
-        for y in 0..8 {
-            for x in 0..8 {
-                if self.squares[x][y].is_some() {
-                    if self.squares[x][y].unwrap().white_piece == white {
-                        if insufficient_piece == true {
-                            return false;
-                        }
+        for i in 0..64 {
+            if self.squares[i].is_some() {
+                if self.squares[i].unwrap().white_piece == white {
+                    if insufficient_piece == true {
+                        return false;
+                    }
 
-                        match self.squares[x][y].unwrap().piece_type {
-                            PieceType::Bishop => { insufficient_piece = true; }
-                            PieceType::Knight => {
-                                knight_num += 1;
+                    match self.squares[i].unwrap().piece_type {
+                        PieceType::Bishop => { insufficient_piece = true; }
+                        PieceType::Knight => {
+                            knight_num += 1;
 
-                                if knight_num == 2 {
-                                    insufficient_piece = true;
-                                }
+                            if knight_num == 2 {
+                                insufficient_piece = true;
                             }
-                            PieceType::King => { }
-                            _ => { return false; }
                         }
+                        PieceType::King => { }
+                        _ => { return false; }
                     }
-                    else {
-                        opp_pieces += 1;
-                    }
+                }
+                else {
+                    opp_pieces += 1;
                 }
             }
         }

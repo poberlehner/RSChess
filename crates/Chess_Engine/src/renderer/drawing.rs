@@ -12,7 +12,7 @@ impl Renderer {
 
         for y in 0..8 {
             for x in 0..8 {
-                if (x + y) % 2 == 0 {
+                if (x + 8 - y) % 2 == 0 {
                     draw_handle.draw_rectangle((x * self.square_size) as i32 + offset, (y * self.square_size) as i32,
                         self.square_size as i32, self.square_size as i32, self.white_square_color);
                 }
@@ -25,35 +25,31 @@ impl Renderer {
     }
 
     pub fn draw_pieces(&mut self, board: &Board, draw_handle: &mut RaylibDrawHandle) {
-        let offset = draw_handle.get_render_width() - self.square_size as i32 * 8;
-
-        for y in 0..8 {
-            for x in 0..8 {
-                if board.squares[x as usize][y as usize].is_some() {
-                    if self.selected_square.is_some() && self.active_selection {
-                        if self.selected_square.unwrap().0 == x as u8 && self.selected_square.unwrap().1 == y as u8 {
-                            continue;
-                        }
+        for i in 0..64 {
+            if board.squares[i].is_some() {
+                if self.selected_square.is_some() && self.active_selection {
+                    if self.selected_square.unwrap() == i as u8 {
+                        continue;
                     }
-
-                    let iswhite: bool = board.squares[x as usize][y as usize].unwrap().white_piece;
-
-                    draw_handle.draw_texture_ex(&self.textures.as_ref().unwrap()
-                        [(board.squares[x as usize][y as usize].unwrap().piece_type as usize - 1) + 6 * !iswhite as usize],
-                        Vector2 { x: offset as f32 + x as f32 * self.square_size as f32, y: y as f32 * self.square_size as f32},
-                        0.0, self.square_size as f32 / self.textures.as_ref().unwrap()
-                        [(board.squares[x as usize][y as usize].unwrap().piece_type as usize - 1) +
-                        6 * !iswhite as usize].height as f32, Color::WHITE);
                 }
+
+                let iswhite: bool = board.squares[i].unwrap().white_piece;
+
+                draw_handle.draw_texture_ex(&self.textures.as_ref().unwrap()
+                    [(board.squares[i].unwrap().piece_type as usize - 1) + 6 * !iswhite as usize],
+                    self.square_index_to_pos(&draw_handle, i as i32),
+                    0.0, self.square_size as f32 / self.textures.as_ref().unwrap()
+                    [(board.squares[i].unwrap().piece_type as usize - 1) +
+                    6 * !iswhite as usize].height as f32, Color::WHITE);
             }
         }
 
         if self.selected_square.is_some() && self.active_selection {
-            if board.squares[self.selected_square.unwrap().0 as usize][self.selected_square.unwrap().1 as usize].is_some() {
+            if board.squares[self.selected_square.unwrap() as usize].is_some() {
                 let texture: &Texture2D =
                     &self.textures.as_ref().unwrap()
-                        [(board.squares[self.selected_square.unwrap().0 as usize][self.selected_square.unwrap().1 as usize].unwrap().piece_type as usize - 1) +
-                        6 * !board.squares[self.selected_square.unwrap().0 as usize][self.selected_square.unwrap().1 as usize].unwrap().white_piece as usize];
+                        [(board.squares[self.selected_square.unwrap() as usize].unwrap().piece_type as usize - 1) +
+                        6 * !board.squares[self.selected_square.unwrap() as usize].unwrap().white_piece as usize];
                 let pos: Vector2 = draw_handle.get_mouse_position() - Vector2::new(self.square_size as f32 / 2.0, self.square_size as f32 / 2.0);
                 draw_handle.draw_texture_ex(texture, pos, 0.0, self.square_size as f32 / texture.height as f32, Color::WHITE);
             }
@@ -71,20 +67,21 @@ impl Renderer {
             }
             TimeControl::Unlimited => { }
         }
+
+        draw_handle.draw_text(format!("X index: {}, Y index: {}, Index: {}", self.mouse_pos_to_square_index(draw_handle) % 8,
+            self.mouse_pos_to_square_index(draw_handle) / 8, self.mouse_pos_to_square_index(draw_handle)).as_str(),100 , 150, 50, Color::WHITE);
     }
 
     //Draws the moves of the selected piece when moves is None
     pub fn draw_moves(&mut self, board: &mut Board, color: Color, moves: Option<Vec<Move>>, draw_handle: &mut RaylibDrawHandle) {
-        let offset = draw_handle.get_render_width() - self.square_size as i32 * 8;
-
         if self.promotion_popup.is_some() {
             self.promotion_popup.as_ref().unwrap().draw(draw_handle, &self.textures.as_ref().unwrap());
         }
 
         if moves.is_some() {
             for m in moves.unwrap() {
-                draw_handle.draw_circle(offset + self.square_size as i32 * m.destination_square.0 as i32 + (self.square_size / 2) as i32,
-                    self.square_size as i32 * m.destination_square.1 as i32 + (self.square_size / 2) as i32, self.square_size as f32 / 8.0, color);
+                draw_handle.draw_circle((self.square_index_to_pos(&draw_handle, m.destination_square as i32).x + (self.square_size / 2) as f32) as i32,
+                    (self.square_index_to_pos(&draw_handle, m.destination_square as i32).y + (self.square_size as i32 / 2) as f32) as i32, self.square_size as f32 / 8.0, color);
             }
         }
         else {
@@ -92,9 +89,8 @@ impl Renderer {
                 let moves = board.get_legal_moves_for_square(self.selected_square.unwrap());
 
                 for m in moves {
-                    let pos_x = offset + self.square_size as i32 * m.destination_square.0 as i32 + (self.square_size / 2) as i32;
-                    let pos_y = self.square_size as i32 * m.destination_square.1 as i32 + (self.square_size / 2) as i32;
-                    draw_handle.draw_circle(pos_x, pos_y, self.square_size as f32 / 8.0, color);
+                    draw_handle.draw_circle((self.square_index_to_pos(&draw_handle, m.destination_square as i32).x + (self.square_size / 2) as f32) as i32,
+                        (self.square_index_to_pos(&draw_handle, m.destination_square as i32).y + (self.square_size / 2) as f32) as i32, self.square_size as f32 / 8.0, color);
                 }
             }
             else {
@@ -114,19 +110,16 @@ impl Renderer {
                     20, 80, 20, Color::WHITE);
                 draw_handle.draw_text(format!("Number of Moves: {}", board.get_legal_moves().as_ref().unwrap().len()).as_str(),
                     20, 110, 20, Color::WHITE);
+                draw_handle.draw_text("Press R to flip the board", 20, 50, 20, Color::WHITE);
             }
         }
     }
 
     pub fn draw_bitboard(&mut self, color: Color, draw_handle: &mut RaylibDrawHandle, bitboard: i64) {
-        let offset = draw_handle.get_render_width() - self.square_size as i32 * 8;
-
-        for y in 0..8 {
-            for x in 0..8 {
-                if (bitboard & (1i64 << (y * 8 + x))) != 0 {
-                    draw_handle.draw_rectangle(offset + self.square_size as i32 * x, self.square_size as i32 * y,
-                        self.square_size as i32, self.square_size as i32, color);
-                }
+        for i in 0..64 {
+            if (bitboard & (1i64 << i)) != 0 {
+                draw_handle.draw_rectangle(self.square_index_to_pos(&draw_handle, i).x as i32, self.square_index_to_pos(&draw_handle, i).y as i32,
+                    self.square_size as i32, self.square_size as i32, color);
             }
         }
     }

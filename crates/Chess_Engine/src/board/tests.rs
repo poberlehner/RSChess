@@ -3,12 +3,13 @@ use crate::board::Board;
 impl Board {
     pub fn test_duplicate_moves(&mut self) {
         let legal_moves = self.get_legal_moves().as_ref().expect("Unable to get legal moves");
-        
+
         for i in 0..legal_moves.len() {
             for j in 0..legal_moves.len() {
                 if i != j {
                     if legal_moves[i] == legal_moves[j] {
-                        eprintln!("Move duplicate: {} -> {}",Self::square_coords_to_chars(legal_moves[i].origin_square).iter().collect::<String>(), Self::square_coords_to_chars(legal_moves[j].destination_square).iter().collect::<String>());
+                        eprintln!("Move duplicate: {} -> {}",Self::square_index_to_chars(legal_moves[i].origin_square).iter().collect::<String>(),
+                            Self::square_index_to_chars(legal_moves[j].destination_square).iter().collect::<String>());
                     }
                 }
             }

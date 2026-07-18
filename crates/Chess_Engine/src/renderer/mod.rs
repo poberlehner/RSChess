@@ -13,11 +13,13 @@ pub struct Renderer
 {
     //The board is at the top right edge of the screen
     square_size: u32,
-    
+
     white_square_color: Color,
     black_square_color: Color,
-    
-    pub(super) selected_square: Option<(u8, u8)>,
+
+    board_flip: bool,
+
+    pub(super) selected_square: Option<u8>,
     //If the mouse button is still being held
     pub(super) active_selection: bool,
 
@@ -38,9 +40,11 @@ impl Renderer
         let renderer: Renderer = Renderer {
             textures: Some(Self::load_piece_textures(raylib_handle, thread, texture_atlas_path, 334)),
             square_size,
-            
+
             selected_square: None,
             active_selection: false,
+
+            board_flip: false,
 
             promotion_popup: None,
             promotion_move: None,

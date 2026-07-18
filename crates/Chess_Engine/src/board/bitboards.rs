@@ -1,5 +1,5 @@
 use crate::board::piece::PieceType;
-use crate::board::r#move::Move;
+use crate::board::r#move::{DIR_INDEX_TO_OFFSET, KNIGHT_JUMP_OFFSETS, Move};
 use crate::board::Board;
 use crate::square_contains;
 
@@ -18,11 +18,9 @@ impl Board {
 
         let mut bitboard: i64 = 0;
 
-        for y in 0..8 {
-            for x in 0..8 {
-                if self.squares[x][y].is_some() {
-                    bitboard = bitboard | ((self.squares[x][y].unwrap().white_piece == white) as i64) << y * 8 + x;
-                }
+        for i in 0..64 {
+            if self.squares[i].is_some() {
+                bitboard = bitboard | ((self.squares[i].unwrap().white_piece == white) as i64) << i;
             }
         }
 
@@ -38,7 +36,7 @@ impl Board {
 
     #[inline(always)]
     pub fn get_all_pieces_bitboard(&mut self) -> i64 {
-        self.generate_pieces_bitboard(false) & self.generate_pieces_bitboard(true)
+        self.generate_pieces_bitboard(false) | self.generate_pieces_bitboard(true)
     }
 
     //Includes the movement of pinned pieces
@@ -246,7 +244,7 @@ impl Board {
         //
         // for x in 0..8 {
         //     for y in 0..8 {
-        //         if self.squares[x][y].is_some() && self.squares[x][y].unwrap().piece_type == PieceType::King && self.squares[x][y].unwrap().white_piece == white {
+        //         if self.squares[iu].is_some() && self.squares[iu].unwrap().piece_type == PieceType::King && self.squares[iu].unwrap().white_piece == white {
         //             king_square = (x as i8, y as i8);
         //         }
         //     }
@@ -466,391 +464,383 @@ impl Board {
         let mut white_en_passant_pin_bitboard: i64 = 0;
         let mut black_en_passant_pin_bitboard: i64 = 0;
 
-        for y in 0..8 {
-            for x in 0..8 {
-                #[allow(non_snake_case)]
-                let X = x as i32;
-                #[allow(non_snake_case)]
-                let Y = y as i32;
+        for i in 0..64u8 {
+            #[allow(non_snake_case)]
+            let I = i as i32;
 
-                if self.squares[x][y].is_some() {
-                    let p = self.squares[x][y].unwrap();
+            let iu = i as usize;
 
-                    match p.piece_type {
-                        PieceType::King => {
-                            for i in -1i32..2 {
-                                for j in -1i32..2 {
-                                    if X + i < 0 || X + i > 7 || Y + j < 0 || Y + j > 7 {
-                                        continue;
+            if self.squares[iu].is_some() {
+                let p = self.squares[iu].unwrap();
+
+                match p.piece_type {
+                    PieceType::King => {
+                        for dir in 0..8 {
+                            if self.distance_to_edge[i as usize][dir] < 1 {
+                                continue;
+                            }
+
+                            if p.white_piece {
+                                white_attack_bitboard |= 1 << I + DIR_INDEX_TO_OFFSET[dir];
+                            }
+                            else {
+                                black_attack_bitboard |= 1 << I + DIR_INDEX_TO_OFFSET[dir];
+                            }
+                        }
+                    }
+                    PieceType::Queen => {
+                        for dir in 0..8 {
+                            let mut potential_bitboard: i64 = 0;
+                            let mut offset = DIR_INDEX_TO_OFFSET[dir];
+                            let mut pin_detection_stage: i32 = 0;
+
+                            //1 = a piece of different color is hit; -1 = not possible in the first place; -2 = not possible anymore
+                            let mut en_passant_pin_stage = 0;
+                            //Stage: 1: (only possible on non-diagonal movement) Pawn hit that can potentially:
+                            //          1) take another pawn by en passant
+                            //          2) be taken by en passant
+                            //Stage 1 task: search for a second pawn immedeately after the first one
+                            //Advance to Stage 2 if: a pawn is hit right after the first one that can:
+                            //  in Case 1) be taken by en passant by the first pawn
+                            //  in Case 2) take the first one by en passant
+                            //Stage 2 task: serach for the king of the color of the pawn to take the other one by en passant
+                            //Stage -1: Not possible anymore
+                            let mut first_hit_white: bool = false;
+                            let mut first_pawn_double_moved: bool = false;
+
+                            if self.game_state.en_passant_square.is_none() {
+                                en_passant_pin_stage = -1;
+                            }
+                            if DIR_INDEX_TO_OFFSET[dir] / 8 != 0 {
+                                en_passant_pin_stage = -1;
+                            }
+
+                            for _ in 0..self.distance_to_edge[i as usize][dir] {
+                                if I + offset < 0 || I + offset >= 64 {
+                                    if pin_detection_stage == 0 && (en_passant_pin_stage == 0 || en_passant_pin_stage == -1) {
+                                        if p.white_piece {
+                                            white_attack_bitboard |= potential_bitboard;
+                                        } else {
+                                            black_attack_bitboard |= potential_bitboard;
+                                        }
                                     }
+                                    break;
+                                }
 
+                                potential_bitboard |= 1 << I + offset;
+
+                                if pin_detection_stage == 0 {
                                     if p.white_piece {
-                                        white_attack_bitboard |= 1 << Self::index_from_coord(((i + x as i32) as u8, (j + y as i32) as u8));
+                                        white_attack_bitboard |= potential_bitboard;
                                     } else {
-                                        black_attack_bitboard |= 1 << Self::index_from_coord(((i + x as i32) as u8, (j + y as i32) as u8));
+                                        black_attack_bitboard |= potential_bitboard;
                                     }
                                 }
-                            }
-                        }
-                        PieceType::Queen => {
-                            for direction in [(-1i32, -1i32), (1, -1), (-1, 1), (1, 1), (0, 1), (0, -1), (1, 0), (-1, 0)] {
-                                let mut potential_bitboard: i64 = 0;
-                                let mut offset = direction;
-                                let mut pin_detection_stage: i32 = 0;
 
-                                //1 = a piece of different color is hit; -1 = not possible in the first place; -2 = not possible anymore
-                                let mut en_passant_pin_stage = 0;
-                                //Stage: 1: (only possible on non-diagonal movement) Pawn hit that can potentially:
-                                //          1) take another pawn by en passant
-                                //          2) be taken by en passant
-                                //Stage 1 task: search for a second pawn immedeately after the first one
-                                //Advance to Stage 2 if: a pawn is hit right after the first one that can:
-                                //  in Case 1) be taken by en passant by the first pawn
-                                //  in Case 2) take the first one by en passant
-                                //Stage 2 task: serach for the king of the color of the pawn to take the other one by en passant
-                                //Stage -1: Not possible anymore
-                                let mut first_hit_white: bool = false;
-                                let mut first_pawn_double_moved: bool = false;
-
-                                if self.game_state.en_passant_square.is_none() {
-                                    en_passant_pin_stage = -1;
-                                }
-                                if direction.1 != 0 {
-                                    en_passant_pin_stage = -1;
-                                }
-
-                                loop {
-                                    if (X + offset.0 <= -1) || (X + offset.0 >= 8) || (Y + offset.1 <= -1) || (Y + offset.1 >= 8) {
-                                        if pin_detection_stage == 0 && (en_passant_pin_stage == 0 || en_passant_pin_stage == -1) {
-                                            if p.white_piece {
-                                                white_attack_bitboard |= potential_bitboard;
+                                if pin_detection_stage != -1 {
+                                    if self.squares[(I + offset) as usize].is_some() {
+                                        if !square_contains!(self, I + offset, !p.white_piece, PieceType::King) {
+                                            if pin_detection_stage == 1 {
+                                                pin_detection_stage = -1;
                                             } else {
-                                                black_attack_bitboard |= potential_bitboard;
-                                            }
-                                        }
-                                        break;
-                                    }
-
-                                    potential_bitboard |= 1 << Self::index_from_coord(((X + offset.0) as u8, (Y + offset.1) as u8));
-
-                                    if pin_detection_stage != -1 {
-                                        if self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].is_some() {
-                                            if !square_contains!(self, X + offset.0, Y + offset.1, !p.white_piece, PieceType::King) {
-                                                if pin_detection_stage == 0 {
-                                                    if p.white_piece {
-                                                        white_attack_bitboard |= potential_bitboard;
-                                                    } else {
-                                                        black_attack_bitboard |= potential_bitboard;
-                                                    }
-                                                }
-
-                                                if pin_detection_stage == 1 {
+                                                if self.squares[(I + offset) as usize].unwrap().white_piece == p.white_piece {
                                                     pin_detection_stage = -1;
                                                 } else {
-                                                    if self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].unwrap().white_piece == p.white_piece {
-                                                        pin_detection_stage = -1;
-                                                    } else {
-                                                        pin_detection_stage = 1;
-                                                    }
+                                                    pin_detection_stage = 1;
                                                 }
-                                            } else {
-                                                if pin_detection_stage == 1 {
-                                                    //Split diagonal and orthogonal
-                                                    if direction.0.abs() + direction.1.abs() == 1 {
-                                                        if p.white_piece {
-                                                            black_orthogonal_pin_bitboard |= (potential_bitboard | 1 << Self::index_from_coord((x as u8, y as u8))) ^ 1 << Self::index_from_coord(((X + offset.0) as u8, (Y + offset.1) as u8));
-                                                        } else {
-                                                            white_orthogonal_pin_bitboard |= (potential_bitboard | 1 << Self::index_from_coord((x as u8, y as u8))) ^ 1 << Self::index_from_coord(((X + offset.0) as u8, (Y + offset.1) as u8));
-                                                        }
-                                                    } else {
-                                                        if p.white_piece {
-                                                            black_diagonal_pin_bitboard |= (potential_bitboard | 1 << Self::index_from_coord((x as u8, y as u8))) ^ 1 << Self::index_from_coord(((X + offset.0) as u8, (Y + offset.1) as u8));
-                                                        } else {
-                                                            white_diagonal_pin_bitboard |= (potential_bitboard | 1 << Self::index_from_coord((x as u8, y as u8))) ^ 1 << Self::index_from_coord(((X + offset.0) as u8, (Y + offset.1) as u8));
-                                                        }
-                                                    }
-
-                                                    pin_detection_stage = -1;
-                                                } else {
-                                                    check_number += 1;
-
+                                            }
+                                        } else {
+                                            if pin_detection_stage == 1 {
+                                                if (DIR_INDEX_TO_OFFSET[dir] % 8).abs() + (DIR_INDEX_TO_OFFSET[dir] / 8).abs() == 1 {
                                                     if p.white_piece {
-                                                        black_check_block_bitboard |= potential_bitboard | 1 << Self::index_from_coord((x as u8, y as u8));
+                                                        black_orthogonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
                                                     } else {
-                                                        white_check_block_bitboard |= potential_bitboard | 1 << Self::index_from_coord((x as u8, y as u8));
+                                                        white_orthogonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
+                                                    }
+                                                } else {
+                                                    if p.white_piece {
+                                                        black_diagonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
+                                                    } else {
+                                                        white_diagonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
                                                     }
                                                 }
+
+                                                pin_detection_stage = -1;
+                                            } else {
+                                                check_number += 1;
+
+                                                if p.white_piece {
+                                                    black_check_block_bitboard |= potential_bitboard | 1 << i;
+                                                } else {
+                                                    white_check_block_bitboard |= potential_bitboard | 1 << i;
+                                                }
                                             }
                                         }
                                     }
+                                }
 
-                                    if en_passant_pin_stage == 0 {
-                                        if self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].is_some() {
-                                            if self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].unwrap().piece_type == PieceType::Pawn {
-                                                //If the pawn can be taken by en passant or can take another one by en passant
-                                                if self.game_state.en_passant_square.unwrap().0 == (X + offset.0) as u8 {
-                                                    first_hit_white = self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].unwrap().white_piece;
-                                                    first_pawn_double_moved = true;
+                                if en_passant_pin_stage == 0 {
+                                    if self.squares[(I + offset) as usize].is_some() {
+                                        if self.squares[(I + offset) as usize].unwrap().piece_type == PieceType::Pawn {
+                                            //If the pawn can be taken by en passant or can take another one by en passant
+                                            if self.game_state.en_passant_square.unwrap() % 8 == (I % 8 + offset % 8) as u8 {
+                                                first_hit_white = self.squares[(I + offset) as usize].unwrap().white_piece;
+                                                first_pawn_double_moved = true;
 
-                                                    en_passant_pin_stage = 1;
+                                                en_passant_pin_stage = 1;
 
-                                                    offset.0 += direction.0;
-                                                    offset.1 += direction.1;
-
-                                                    continue;
-                                                } else if self.game_state.en_passant_square.unwrap().0 == (X + offset.0 + direction.0) as u8 {
-                                                    first_hit_white = self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].unwrap().white_piece;
-                                                    first_pawn_double_moved = false;
-
-                                                    en_passant_pin_stage = 1;
-
-                                                    offset.0 += direction.0;
-                                                    offset.1 += direction.1;
-
-                                                    continue;
-                                                } else {
-                                                    en_passant_pin_stage = -2;
-                                                }
-                                            } else {
-                                                en_passant_pin_stage = -2;
-                                            }
-                                        }
-                                    }
-                                    if en_passant_pin_stage == 1 {
-                                        //If a second Pawn is hit that is the opposite color
-                                        if self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].is_some() && self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].unwrap().piece_type == PieceType::Pawn && self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].unwrap().white_piece == !first_hit_white {
-                                            if !first_pawn_double_moved {
-                                                if self.game_state.en_passant_square.unwrap().0 == (X + offset.0) as u8 {
-                                                    en_passant_pin_stage = 2;
-
-                                                    offset.0 += direction.0;
-                                                    offset.1 += direction.1;
-
-                                                    continue;
-                                                } else {
-                                                    en_passant_pin_stage = -2;
-                                                }
-                                            } else {
-                                                en_passant_pin_stage = 2;
-
-                                                offset.0 += direction.0;
-                                                offset.1 += direction.1;
+                                                offset += DIR_INDEX_TO_OFFSET[dir];
 
                                                 continue;
-                                            }
-                                        }
-                                    }
-                                    if en_passant_pin_stage == 2 {
-                                        if self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].is_some() {
-                                            if self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].unwrap().piece_type == PieceType::King {
-                                                //if self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].unwrap().white_piece != p.white_piece {
-                                                if p.white_piece {
-                                                    black_en_passant_pin_bitboard |= potential_bitboard;
-                                                } else {
-                                                    white_en_passant_pin_bitboard |= potential_bitboard;
-                                                }
-                                                // }
-                                                // else {
-                                                //     en_passant_pin_stage = -2;
-                                                // }
-                                            } else {
-                                                en_passant_pin_stage = -2;
-                                            }
-                                        }
-                                    }
+                                            } else if self.game_state.en_passant_square.unwrap() % 8 == (I % 8 + offset % 8 + DIR_INDEX_TO_OFFSET[dir] % 8) as u8 {
+                                                first_hit_white = self.squares[(I + offset) as usize].unwrap().white_piece;
+                                                first_pawn_double_moved = false;
 
-                                    if pin_detection_stage == -1 && (en_passant_pin_stage == -1 || en_passant_pin_stage == -2) {
-                                        break;
-                                    }
+                                                en_passant_pin_stage = 1;
 
-                                    offset.0 += direction.0;
-                                    offset.1 += direction.1;
-                                }
-                            }
-                        }
-                        PieceType::Rook => {
-                            for direction in [(0i32, 1i32), (0, -1), (1, 0), (-1, 0)] {
-                                let mut potential_bitboard: i64 = 0;
-                                let mut offset = direction;
-                                let mut pin_detection_stage: i32 = 0;
-
-                                //1 = a piece of different color is hit; -1 = not possible in the first place; -2 = not possible anymore
-                                let mut en_passant_pin_stage = 0;
-                                //Stage: 1: (only possible on non-diagonal movement) Pawn hit that can potentially:
-                                //          1) take another pawn by en passant
-                                //          2) be taken by en passant
-                                //Stage 1 task: search for a second pawn immedeately after the first one
-                                //Advance to Stage 2 if: a pawn is hit right after the first one that can:
-                                //  in Case 1) be taken by en passant by the first pawn
-                                //  in Case 2) take the first one by en passant
-                                //Stage 2 task: serach for the king of the color of the pawn to take the other one by en passant
-                                //Stage -1: Not possible anymore
-                                let mut first_hit_white: bool = false;
-                                let mut first_pawn_double_moved: bool = false;
-
-                                if self.game_state.en_passant_square.is_none() {
-                                    en_passant_pin_stage = -1;
-                                }
-                                if direction.1 != 0 {
-                                    en_passant_pin_stage = -1;
-                                }
-
-                                loop {
-                                    if (X + offset.0 <= -1) || (X + offset.0 >= 8) || (Y + offset.1 <= -1) || (Y + offset.1 >= 8) {
-                                        if pin_detection_stage == 0 && (en_passant_pin_stage == 0 || en_passant_pin_stage == -1) {
-                                            if p.white_piece {
-                                                white_attack_bitboard |= potential_bitboard;
-                                            } else {
-                                                black_attack_bitboard |= potential_bitboard;
-                                            }
-                                        }
-                                        break;
-                                    }
-
-                                    potential_bitboard |= 1 << Self::index_from_coord(((X + offset.0) as u8, (Y + offset.1) as u8));
-
-                                    if pin_detection_stage != -1 {
-                                        if self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].is_some() {
-                                            if !square_contains!(self, X + offset.0, Y + offset.1, !p.white_piece, PieceType::King) {
-                                                if pin_detection_stage == 0 {
-                                                    if p.white_piece {
-                                                        white_attack_bitboard |= potential_bitboard;
-                                                    } else {
-                                                        black_attack_bitboard |= potential_bitboard;
-                                                    }
-                                                }
-
-                                                if pin_detection_stage == 1 {
-                                                    pin_detection_stage = -1;
-                                                } else {
-                                                    if self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].unwrap().white_piece == p.white_piece {
-                                                        pin_detection_stage = -1;
-                                                    } else {
-                                                        pin_detection_stage = 1;
-                                                    }
-                                                }
-                                            } else {
-                                                if pin_detection_stage == 1 {
-                                                    if direction.0.abs() + direction.1.abs() == 1 {
-                                                        if p.white_piece {
-                                                            black_orthogonal_pin_bitboard |= (potential_bitboard | 1 << Self::index_from_coord((x as u8, y as u8))) ^ 1 << Self::index_from_coord(((X + offset.0) as u8, (Y + offset.1) as u8));
-                                                        } else {
-                                                            white_orthogonal_pin_bitboard |= (potential_bitboard | 1 << Self::index_from_coord((x as u8, y as u8))) ^ 1 << Self::index_from_coord(((X + offset.0) as u8, (Y + offset.1) as u8));
-                                                        }
-                                                    } else {
-                                                        if p.white_piece {
-                                                            black_diagonal_pin_bitboard |= (potential_bitboard | 1 << Self::index_from_coord((x as u8, y as u8))) ^ 1 << Self::index_from_coord(((X + offset.0) as u8, (Y + offset.1) as u8));
-                                                        } else {
-                                                            white_diagonal_pin_bitboard |= (potential_bitboard | 1 << Self::index_from_coord((x as u8, y as u8))) ^ 1 << Self::index_from_coord(((X + offset.0) as u8, (Y + offset.1) as u8));
-                                                        }
-                                                    }
-
-                                                    pin_detection_stage = -1;
-                                                } else {
-                                                    check_number += 1;
-
-                                                    if p.white_piece {
-                                                        black_check_block_bitboard |= potential_bitboard | 1 << Self::index_from_coord((x as u8, y as u8));
-                                                    } else {
-                                                        white_check_block_bitboard |= potential_bitboard | 1 << Self::index_from_coord((x as u8, y as u8));
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    if en_passant_pin_stage == 0 {
-                                        if self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].is_some() {
-                                            if self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].unwrap().piece_type == PieceType::Pawn {
-                                                //If the pawn can be taken by en passant or can take another one by en passant
-                                                if self.game_state.en_passant_square.unwrap().0 == (X + offset.0) as u8 {
-                                                    first_hit_white = self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].unwrap().white_piece;
-                                                    first_pawn_double_moved = true;
-
-                                                    en_passant_pin_stage = 1;
-
-                                                    offset.0 += direction.0;
-                                                    offset.1 += direction.1;
-
-                                                    continue;
-                                                } else if self.game_state.en_passant_square.unwrap().0 == (X + offset.0 + direction.0) as u8 {
-                                                    first_hit_white = self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].unwrap().white_piece;
-                                                    first_pawn_double_moved = false;
-
-                                                    en_passant_pin_stage = 1;
-
-                                                    offset.0 += direction.0;
-                                                    offset.1 += direction.1;
-
-                                                    continue;
-                                                } else {
-                                                    en_passant_pin_stage = -2;
-                                                }
-                                            } else {
-                                                en_passant_pin_stage = -2;
-                                            }
-                                        }
-                                    }
-                                    if en_passant_pin_stage == 1 {
-                                        //If a second Pawn is hit that is the opposite color
-                                        if self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].is_some() && self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].unwrap().piece_type == PieceType::Pawn && self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].unwrap().white_piece == !first_hit_white {
-                                            if !first_pawn_double_moved {
-                                                if self.game_state.en_passant_square.unwrap().0 == (X + offset.0) as u8 {
-                                                    en_passant_pin_stage = 2;
-
-                                                    offset.0 += direction.0;
-                                                    offset.1 += direction.1;
-
-                                                    continue;
-                                                } else {
-                                                    en_passant_pin_stage = -2;
-                                                }
-                                            } else {
-                                                en_passant_pin_stage = 2;
-
-                                                offset.0 += direction.0;
-                                                offset.1 += direction.1;
+                                                offset += DIR_INDEX_TO_OFFSET[dir];
 
                                                 continue;
-                                            }
-                                        }
-                                    }
-                                    if en_passant_pin_stage == 2 {
-                                        if self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].is_some() {
-                                            if self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].unwrap().piece_type == PieceType::King {
-                                                //if self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].unwrap().white_piece != p.white_piece {
-                                                if p.white_piece {
-                                                    black_en_passant_pin_bitboard |= potential_bitboard;
-                                                } else {
-                                                    white_en_passant_pin_bitboard |= potential_bitboard;
-                                                }
-                                                // }
-                                                // else {
-                                                //     en_passant_pin_stage = -2;
-                                                // }
                                             } else {
                                                 en_passant_pin_stage = -2;
                                             }
+                                        } else {
+                                            en_passant_pin_stage = -2;
                                         }
                                     }
-
-                                    if pin_detection_stage == -1 && (en_passant_pin_stage == -1 || en_passant_pin_stage == -2) {
-                                        break;
-                                    }
-
-                                    offset.0 += direction.0;
-                                    offset.1 += direction.1;
                                 }
+                                if en_passant_pin_stage == 1 {
+                                    //If a second Pawn is hit that is the opposite color
+                                    if self.squares[(I + offset) as usize].is_some() && self.squares[(I + offset) as usize].unwrap().piece_type ==
+                                        PieceType::Pawn && self.squares[(I + offset) as usize].unwrap().white_piece == !first_hit_white {
+                                        if !first_pawn_double_moved {
+                                            if self.game_state.en_passant_square.unwrap() % 8 == (I % 8 + offset % 8) as u8 {
+                                                en_passant_pin_stage = 2;
+
+                                                offset += DIR_INDEX_TO_OFFSET[dir];
+
+                                                continue;
+                                            } else {
+                                                en_passant_pin_stage = -2;
+                                            }
+                                        } else {
+                                            en_passant_pin_stage = 2;
+
+                                            offset += DIR_INDEX_TO_OFFSET[dir];
+
+                                            continue;
+                                        }
+                                    }
+                                }
+                                if en_passant_pin_stage == 2 {
+                                    if self.squares[(I + offset) as usize].is_some() {
+                                        if self.squares[(I + offset) as usize].unwrap().piece_type == PieceType::King {
+                                            //if self.squares[(I + offset) as usize].unwrap().white_piece != p.white_piece {
+                                            if p.white_piece {
+                                                black_en_passant_pin_bitboard |= potential_bitboard;
+                                            } else {
+                                                white_en_passant_pin_bitboard |= potential_bitboard;
+                                            }
+                                            // }
+                                            // else {
+                                            //     en_passant_pin_stage = -2;
+                                            // }
+                                        } else {
+                                            en_passant_pin_stage = -2;
+                                        }
+                                    }
+                                }
+
+                                if pin_detection_stage == -1 && (en_passant_pin_stage == -1 || en_passant_pin_stage == -2) {
+                                    break;
+                                }
+
+                                offset += DIR_INDEX_TO_OFFSET[dir];
                             }
                         }
-                        PieceType::Bishop => {
-                            for direction in [(-1i32, -1i32), (1, -1), (-1, 1), (1, 1)] {
-                                let mut potential_bitboard: i64 = 0;
-                                let mut offset = direction;
-                                let mut pin_detection = false;
+                    }
+                    PieceType::Rook => {
+                        for dir in 0..4 {
+                            let mut potential_bitboard: i64 = 0;
+                            let mut offset = DIR_INDEX_TO_OFFSET[dir];
+                            let mut pin_detection_stage: i32 = 0;
 
-                                loop {
-                                    if (X + offset.0 <= -1) || (X + offset.0 >= 8) || (Y + offset.1 <= -1) || (Y + offset.1 >= 8) {
+                            //1 = a piece of different color is hit; -1 = not possible in the first place; -2 = not possible anymore
+                            let mut en_passant_pin_stage = 0;
+                            //Stage: 1: (only possible on non-diagonal movement) Pawn hit that can potentially:
+                            //          1) take another pawn by en passant
+                            //          2) be taken by en passant
+                            //Stage 1 task: search for a second pawn immedeately after the first one
+                            //Advance to Stage 2 if: a pawn is hit right after the first one that can:
+                            //  in Case 1) be taken by en passant by the first pawn
+                            //  in Case 2) take the first one by en passant
+                            //Stage 2 task: serach for the king of the color of the pawn to take the other one by en passant
+                            //Stage -1: Not possible anymore
+                            let mut first_hit_white: bool = false;
+                            let mut first_pawn_double_moved: bool = false;
+
+                            if self.game_state.en_passant_square.is_none() {
+                                en_passant_pin_stage = -1;
+                            }
+                            if DIR_INDEX_TO_OFFSET[dir] / 8 != 0 {
+                                en_passant_pin_stage = -1;
+                            }
+
+                            for _ in 0..self.distance_to_edge[i as usize][dir] {
+                                if I + offset < 0 || I + offset >= 64 {
+                                    if pin_detection_stage == 0 && (en_passant_pin_stage == 0 || en_passant_pin_stage == -1) {
+                                        if p.white_piece {
+                                            white_attack_bitboard |= potential_bitboard;
+                                        } else {
+                                            black_attack_bitboard |= potential_bitboard;
+                                        }
+                                    }
+                                    break;
+                                }
+
+                                potential_bitboard |= 1 << I + offset;
+
+                                if pin_detection_stage == 0 {
+                                    if p.white_piece {
+                                        white_attack_bitboard |= potential_bitboard;
+                                    } else {
+                                        black_attack_bitboard |= potential_bitboard;
+                                    }
+                                }
+
+                                if pin_detection_stage != -1 {
+                                    if self.squares[(I + offset) as usize].is_some() {
+                                        if !square_contains!(self, I + offset, !p.white_piece, PieceType::King) {
+                                            if pin_detection_stage == 1 {
+                                                pin_detection_stage = -1;
+                                            } else {
+                                                if self.squares[(I + offset) as usize].unwrap().white_piece == p.white_piece {
+                                                    pin_detection_stage = -1;
+                                                } else {
+                                                    pin_detection_stage = 1;
+                                                }
+                                            }
+                                        } else {
+                                            if pin_detection_stage == 1 {
+                                                if (DIR_INDEX_TO_OFFSET[dir] % 8).abs() + (DIR_INDEX_TO_OFFSET[dir] / 8).abs() == 1 {
+                                                    if p.white_piece {
+                                                        black_orthogonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
+                                                    } else {
+                                                        white_orthogonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
+                                                    }
+                                                } else {
+                                                    if p.white_piece {
+                                                        black_diagonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
+                                                    } else {
+                                                        white_diagonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
+                                                    }
+                                                }
+
+                                                pin_detection_stage = -1;
+                                            } else {
+                                                check_number += 1;
+
+                                                if p.white_piece {
+                                                    black_check_block_bitboard |= potential_bitboard | 1 << i;
+                                                } else {
+                                                    white_check_block_bitboard |= potential_bitboard | 1 << i;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if en_passant_pin_stage == 0 {
+                                    if self.squares[(I + offset) as usize].is_some() {
+                                        if self.squares[(I + offset) as usize].unwrap().piece_type == PieceType::Pawn {
+                                            //If the pawn can be taken by en passant or can take another one by en passant
+                                            if self.game_state.en_passant_square.unwrap() % 8 == (I % 8 + offset % 8) as u8 {
+                                                first_hit_white = self.squares[(I + offset) as usize].unwrap().white_piece;
+                                                first_pawn_double_moved = true;
+
+                                                en_passant_pin_stage = 1;
+
+                                                offset += DIR_INDEX_TO_OFFSET[dir];
+
+                                                continue;
+                                            } else if self.game_state.en_passant_square.unwrap() % 8 == (I % 8 + offset % 8 + DIR_INDEX_TO_OFFSET[dir] % 8) as u8 {
+                                                first_hit_white = self.squares[(I + offset) as usize].unwrap().white_piece;
+                                                first_pawn_double_moved = false;
+
+                                                en_passant_pin_stage = 1;
+
+                                                offset += DIR_INDEX_TO_OFFSET[dir];
+
+                                                continue;
+                                            } else {
+                                                en_passant_pin_stage = -2;
+                                            }
+                                        } else {
+                                            en_passant_pin_stage = -2;
+                                        }
+                                    }
+                                }
+                                if en_passant_pin_stage == 1 {
+                                    //If a second Pawn is hit that is the opposite color
+                                    if self.squares[(I + offset) as usize].is_some() && self.squares[(I + offset) as usize].unwrap().piece_type ==
+                                        PieceType::Pawn && self.squares[(I + offset) as usize].unwrap().white_piece == !first_hit_white {
+                                        if !first_pawn_double_moved {
+                                            if self.game_state.en_passant_square.unwrap() % 8 == (I % 8 + offset % 8) as u8 {
+                                                en_passant_pin_stage = 2;
+
+                                                offset += DIR_INDEX_TO_OFFSET[dir];
+
+                                                continue;
+                                            } else {
+                                                en_passant_pin_stage = -2;
+                                            }
+                                        } else {
+                                            en_passant_pin_stage = 2;
+
+                                            offset += DIR_INDEX_TO_OFFSET[dir];
+
+                                            continue;
+                                        }
+                                    }
+                                }
+                                if en_passant_pin_stage == 2 {
+                                    if self.squares[(I + offset) as usize].is_some() {
+                                        if self.squares[(I + offset) as usize].unwrap().piece_type == PieceType::King {
+                                            //if self.squares[(I + offset) as usize].unwrap().white_piece != p.white_piece {
+                                            if p.white_piece {
+                                                black_en_passant_pin_bitboard |= potential_bitboard;
+                                            } else {
+                                                white_en_passant_pin_bitboard |= potential_bitboard;
+                                            }
+                                            // }
+                                            // else {
+                                            //     en_passant_pin_stage = -2;
+                                            // }
+                                        } else {
+                                            en_passant_pin_stage = -2;
+                                        }
+                                    }
+                                }
+
+                                if pin_detection_stage == -1 && (en_passant_pin_stage == -1 || en_passant_pin_stage == -2) {
+                                    break;
+                                }
+
+                                offset += DIR_INDEX_TO_OFFSET[dir];
+                            }
+                        }
+                    }
+                    PieceType::Bishop => {
+                        for dir in 4..8 {
+                            let mut potential_bitboard: i64 = 0;
+                            let mut offset = DIR_INDEX_TO_OFFSET[dir];
+                            let mut pin_detection = false;
+
+                            for _ in 0..self.distance_to_edge[i as usize][dir] {
+                                potential_bitboard |= 1 << I + offset;
+
+                                if self.squares[(I + offset) as usize].is_some() {
+                                    if !square_contains!(self, I + offset, !p.white_piece, PieceType::King) {
                                         if pin_detection {
                                             break;
                                         }
@@ -860,126 +850,118 @@ impl Board {
                                         } else {
                                             black_attack_bitboard |= potential_bitboard;
                                         }
-                                        break;
-                                    }
 
-                                    potential_bitboard |= 1 << Self::index_from_coord(((X + offset.0) as u8, (Y + offset.1) as u8));
-
-                                    if self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].is_some() {
-                                        if !square_contains!(self, X + offset.0, Y + offset.1, !p.white_piece, PieceType::King) {
-                                            if pin_detection {
-                                                break;
+                                        if self.squares[(I + offset) as usize].unwrap().white_piece == p.white_piece {
+                                            break;
+                                        } else {
+                                            pin_detection = true;
+                                        }
+                                    } else {
+                                        if pin_detection {
+                                            if (DIR_INDEX_TO_OFFSET[dir] % 8).abs() + (DIR_INDEX_TO_OFFSET[dir] / 8).abs() == 1 {
+                                                if p.white_piece {
+                                                    black_orthogonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
+                                                } else {
+                                                    white_orthogonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
+                                                }
+                                            } else {
+                                                if p.white_piece {
+                                                    black_diagonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
+                                                } else {
+                                                    white_diagonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
+                                                }
                                             }
+
+                                            break;
+                                        } else {
+                                            check_number += 1;
 
                                             if p.white_piece {
-                                                white_attack_bitboard |= potential_bitboard;
+                                                black_check_block_bitboard |= potential_bitboard | 1 << i;
                                             } else {
-                                                black_attack_bitboard |= potential_bitboard;
-                                            }
-
-                                            if self.squares[(X + offset.0) as usize][(Y + offset.1) as usize].unwrap().white_piece == p.white_piece {
-                                                break;
-                                            } else {
-                                                pin_detection = true;
-                                            }
-                                        } else {
-                                            if pin_detection {
-                                                if direction.0.abs() + direction.1.abs() == 1 {
-                                                    if p.white_piece {
-                                                        black_orthogonal_pin_bitboard |= (potential_bitboard | 1 << Self::index_from_coord((x as u8, y as u8))) ^ 1 << Self::index_from_coord(((X + offset.0) as u8, (Y + offset.1) as u8));
-                                                    } else {
-                                                        white_orthogonal_pin_bitboard |= (potential_bitboard | 1 << Self::index_from_coord((x as u8, y as u8))) ^ 1 << Self::index_from_coord(((X + offset.0) as u8, (Y + offset.1) as u8));
-                                                    }
-                                                } else {
-                                                    if p.white_piece {
-                                                        black_diagonal_pin_bitboard |= (potential_bitboard | 1 << Self::index_from_coord((x as u8, y as u8))) ^ 1 << Self::index_from_coord(((X + offset.0) as u8, (Y + offset.1) as u8));
-                                                    } else {
-                                                        white_diagonal_pin_bitboard |= (potential_bitboard | 1 << Self::index_from_coord((x as u8, y as u8))) ^ 1 << Self::index_from_coord(((X + offset.0) as u8, (Y + offset.1) as u8));
-                                                    }
-                                                }
-
-                                                break;
-                                            } else {
-                                                check_number += 1;
-
-                                                if p.white_piece {
-                                                    black_check_block_bitboard |= potential_bitboard | 1 << Self::index_from_coord((x as u8, y as u8));
-                                                } else {
-                                                    white_check_block_bitboard |= potential_bitboard | 1 << Self::index_from_coord((x as u8, y as u8));
-                                                }
+                                                white_check_block_bitboard |= potential_bitboard | 1 << i;
                                             }
                                         }
                                     }
-
-                                    offset.0 += direction.0;
-                                    offset.1 += direction.1;
                                 }
+
+                                offset += DIR_INDEX_TO_OFFSET[dir];
                             }
-                        }
-                        PieceType::Knight => {
-                            for target in [(-1i32, -2i32), (-2, -1), (-2, 1), (1, -2), (1, 2), (-1, 2), (2, 1), (2, -1)] {
-                                if target.0 + X > 7 || target.0 + X < 0 || target.1 + Y < 0 || target.1 + Y > 7 {
-                                    continue;
-                                }
 
+                            if !pin_detection {
                                 if p.white_piece {
-                                    white_attack_bitboard |= 1 << Self::index_from_coord(((target.0 + X) as u8, (target.1 + Y) as u8));
+                                    white_attack_bitboard |= potential_bitboard;
                                 } else {
-                                    black_attack_bitboard |= 1 << Self::index_from_coord(((target.0 + X) as u8, (target.1 + Y) as u8));
+                                    black_attack_bitboard |= potential_bitboard;
                                 }
+                            }
+                        }
+                    }
+                    PieceType::Knight => {
+                        for dir in 0..8 {
+                            if !self.knight_jump_legality[i as usize][dir] {
+                                continue;
+                            }
 
-                                if self.squares[(X + target.0) as usize][(Y + target.1) as usize].is_some() {
-                                    if square_contains!(self, X + target.0, Y + target.1, !p.white_piece, PieceType::King) {
-                                        check_number += 1;
+                            if p.white_piece {
+                                white_attack_bitboard |= 1 << I + KNIGHT_JUMP_OFFSETS[dir];
+                            } else {
+                                black_attack_bitboard |= 1 << I + KNIGHT_JUMP_OFFSETS[dir];
+                            }
 
-                                        if p.white_piece {
-                                            black_check_block_bitboard |= 1 << Self::index_from_coord(((target.0 + X) as u8, (target.1 + Y) as u8)) | 1 << Self::index_from_coord((x as u8, y as u8));
-                                        } else {
-                                            white_check_block_bitboard |= 1 << Self::index_from_coord(((target.0 + X) as u8, (target.1 + Y) as u8)) | 1 << Self::index_from_coord((x as u8, y as u8));
-                                        }
+                            if self.squares[(I + KNIGHT_JUMP_OFFSETS[dir]) as usize].is_some() {
+                                if square_contains!(self, I + KNIGHT_JUMP_OFFSETS[dir], !p.white_piece, PieceType::King) {
+                                    check_number += 1;
+
+                                    if p.white_piece {
+                                        black_check_block_bitboard |= (1 << I + KNIGHT_JUMP_OFFSETS[dir]) | (1 << i);
+                                    } else {
+                                        white_check_block_bitboard |= (1 << I + KNIGHT_JUMP_OFFSETS[dir]) | (1 << i);
                                     }
                                 }
                             }
                         }
-                        PieceType::Pawn => {
-                            if y != 0 && y != 7 {
-                                let row_in_front: u8 = if p.white_piece { (Y - 1) as u8 } else { (Y + 1) as u8 };
+                    }
+                    PieceType::Pawn => {
+                        if i < 8 || i > 55 {
+                            continue;
+                        }
 
-                                if x != 0 {
-                                    if p.white_piece {
-                                        white_attack_bitboard |= 1 << Self::index_from_coord(((X - 1) as u8, row_in_front));
-                                    } else {
-                                        black_attack_bitboard |= 1 << Self::index_from_coord(((X - 1) as u8, row_in_front));
-                                    }
+                        let row_in_front: u8 = if p.white_piece { i + 8 } else { i - 8 };
 
-                                    if square_contains!(self, X - 1, row_in_front, !p.white_piece, PieceType::King) {
-                                        if p.white_piece {
-                                            black_check_block_bitboard |= 1 << Self::index_from_coord(((X - 1) as u8, row_in_front)) | 1 << Self::index_from_coord((x as u8, y as u8));
-                                        } else {
-                                            white_check_block_bitboard |= 1 << Self::index_from_coord(((X - 1) as u8, row_in_front)) | 1 << Self::index_from_coord((x as u8, y as u8));
-                                        }
-                                    }
-                                }
-                                if x != 7 {
-                                    if p.white_piece {
-                                        white_attack_bitboard |= 1 << Self::index_from_coord(((X + 1) as u8, row_in_front));
-                                    } else {
-                                        black_attack_bitboard |= 1 << Self::index_from_coord(((X + 1) as u8, row_in_front));
-                                    }
+                        if i % 8 != 0 {
+                            if p.white_piece {
+                                white_attack_bitboard |= 1 << row_in_front - 1;
+                            } else {
+                                black_attack_bitboard |= 1 << row_in_front - 1;
+                            }
 
-                                    if square_contains!(self, X + 1, row_in_front, !p.white_piece, PieceType::King) {
-                                        if p.white_piece {
-                                            black_check_block_bitboard |= 1 << Self::index_from_coord(((X + 1) as u8, row_in_front)) | 1 << Self::index_from_coord((x as u8, y as u8));
-                                        } else {
-                                            white_check_block_bitboard |= 1 << Self::index_from_coord(((X + 1) as u8, row_in_front)) | 1 << Self::index_from_coord((x as u8, y as u8));
-                                        }
-                                    }
+                            if square_contains!(self, row_in_front - 1, !p.white_piece, PieceType::King) {
+                                if p.white_piece {
+                                    black_check_block_bitboard |= (1 << row_in_front - 1) | (1 << i);
+                                } else {
+                                    white_check_block_bitboard |= (1 << row_in_front - 1) | (1 << i);
                                 }
                             }
                         }
-                        _ => {
-                            eprintln!("Piece on square ({}, {}) set to None", x, y);
+                        if i % 8 != 7 {
+                            if p.white_piece {
+                                white_attack_bitboard |= 1 << row_in_front + 1;
+                            } else {
+                                black_attack_bitboard |= 1 << row_in_front + 1;
+                            }
+
+                            if square_contains!(self, row_in_front + 1, !p.white_piece, PieceType::King) {
+                                if p.white_piece {
+                                    black_check_block_bitboard |= (1 << row_in_front + 1) | (1 << i);
+                                } else {
+                                    white_check_block_bitboard |= (1 << row_in_front + 1) | (1 << i);
+                                }
+                            }
                         }
+                    }
+                    _ => {
+                        eprintln!("Piece on square ({}, {}) set to None", i % 8, i / 8);
                     }
                 }
             }

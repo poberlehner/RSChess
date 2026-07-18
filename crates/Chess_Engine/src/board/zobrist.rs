@@ -16,7 +16,7 @@ impl Zobrist {
     pub fn new() -> Zobrist {
         #[cfg(debug_assertions)]
         let start_time = std::time::Instant::now();
-        
+
         let mut zobrist: Zobrist = Zobrist { square_nums: [[0; 15]; 64], castling_states_nums: [0; 16], en_passant: [0; 9], side_to_move: 0 };
         let mut rng: SmallRng = rand::make_rng();
 
@@ -46,7 +46,7 @@ impl Zobrist {
         let mut key: i64 = 0;
 
         for i in 0..64 {
-            let piece = board.squares[i % 8][i / 8];
+            let piece = board.squares[i];
 
             if piece.is_some() {
                 key ^= self.square_nums[i][piece.unwrap().as_num()];
@@ -57,7 +57,7 @@ impl Zobrist {
             key ^= self.en_passant[0];
         }
         else {
-            key ^= self.en_passant[(board.game_state.en_passant_square.unwrap().0 + 1) as usize];
+            key ^= self.en_passant[(board.game_state.en_passant_square.unwrap() % 8 + 1) as usize];
         }
 
         if board.game_state.white_to_move {

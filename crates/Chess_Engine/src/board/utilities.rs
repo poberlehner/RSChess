@@ -12,13 +12,13 @@ pub enum TimeControl
 }
 
 #[macro_export] macro_rules! square_contains {
-    ($board:ident, $x:expr, $y:expr, $white:expr, $piece_type:expr) => {
-        if ($board).squares[$x as usize][$y as usize].is_none() {
+    ($board:ident, $i:expr, $white:expr, $piece_type:expr) => {
+        if ($board).squares[$i as usize].is_none() {
              false
         }
         else {
-            if ($board).squares[$x as usize][$y as usize].unwrap().white_piece == $white as bool {
-                if ($board).squares[$x as usize][$y as usize].unwrap().piece_type == $piece_type as PieceType {
+            if ($board).squares[$i as usize].unwrap().white_piece == $white as bool {
+                if ($board).squares[$i as usize].unwrap().piece_type == $piece_type as PieceType {
                      true
                 }
                 else {
@@ -48,7 +48,7 @@ impl Board {
         }
     }
 
-    //The return value is always lowercase
+    //The return value is lowercase
     #[inline(always)]
     pub fn column_index_to_char(column: i32) -> Option<char> {
         match column {
@@ -65,22 +65,21 @@ impl Board {
     }
 
     #[inline(always)]
-    pub fn square_coords_to_chars(coords: (u8, u8)) -> [char; 2] {
-        //TODO: Analyze removing the quick fix for inverting the indices to avoid having to change the default positions of white and black
+    pub fn square_index_to_chars(index: u8) -> [char; 2] {
         let mut result: [char; 2] = ['0', '0'];
 
-        result[0] = Self::column_index_to_char(coords.0 as i32).expect("Invalid coordinate");
-        result[1] = char::from_digit(((7 - coords.1 as i32) + 1) as u32, 10).expect("Invalid coordinate");
+        result[0] = Self::column_index_to_char((index % 8) as i32).expect("Invalid coordinate");
+        result[1] = char::from_digit(((index / 8) as i32 + 1) as u32, 10).expect("Invalid coordinate");
 
         result
     }
 
     #[inline(always)]
-    pub fn square_coords_to_string(coords: (u8, u8)) -> String {
+    pub fn square_index_to_string(index: u8) -> String {
         let mut result: String = String::from("");
 
-        result.push(Self::column_index_to_char(coords.0 as i32).expect("Invalid coordinate"));
-        result.push(char::from_digit(((7 - coords.1 as i32) + 1) as u32, 10).expect("Invalid coordinate"));
+        result.push(Self::column_index_to_char((index % 8) as i32).expect("Invalid coordinate"));
+        result.push(char::from_digit(((index / 8) as i32 + 1) as u32, 10).expect("Invalid coordinate"));
 
         result
     }
@@ -121,7 +120,7 @@ impl Board {
     pub fn checkmate(&mut self) -> bool {
         let king_pos = if self.game_state.white_to_move { self.white_king_pos } else { self.black_king_pos };
         let attack_bitboard = self.get_attacked_squares_bitboard(!self.game_state.white_to_move);
-        if ((1 << Self::index_from_coord(king_pos)) & attack_bitboard) != 0 {
+        if ((1 << king_pos) & attack_bitboard) != 0 {
             let moves = self.get_legal_moves().as_ref().expect("Failed to get legal moves");
 
             if moves.len() == 0 {
@@ -140,7 +139,7 @@ impl Board {
 
         let attack_bitboard = self.get_attacked_squares_bitboard(!self.game_state.white_to_move);
 
-        if (attack_bitboard & (1 << Self::index_from_coord((king_pos.0, king_pos.1)))) != 0 {
+        if (attack_bitboard & (1 << king_pos)) != 0 {
             return true
         }
 
@@ -148,9 +147,7 @@ impl Board {
     }
 
     pub fn load_fen(&mut self, fen: &str) {
-        #[cfg(debug_assertions)]
-        let start_time = std::time::Instant::now();
-        self.squares = [[None; 8]; 8];
+        self.squares = [None; 64];
 
         self.game_state.castling_rights = [false; 4];
         self.game_state.en_passant_square = None;
@@ -161,7 +158,7 @@ impl Board {
         let chars = fen.chars().collect::<Vec<char>>();
 
         //---------------Group 1--------------
-        let mut target_row: usize = 0;
+        let mut target_row: usize = 7;
         let mut target_col: usize = 0;
 
         for char in fen.chars() {
@@ -176,39 +173,39 @@ impl Board {
 
             match lowercase {
                 '/' => {
-                    target_row += 1;
+                    target_row -= 1;
                     target_col = 0;
                 }
                 'k' => {
-                    self.squares[target_col][target_row] = Some(Piece { piece_type: PieceType::King, white_piece: white });
+                    self.squares[target_col + target_row * 8] = Some(Piece { piece_type: PieceType::King, white_piece: white });
 
                     if white {
-                        self.white_king_pos = (target_col as u8, target_row as u8);
+                        self.white_king_pos = (target_col + target_row * 8) as u8;
                     }
                     else {
-                        self.black_king_pos = (target_col as u8, target_row as u8);
+                        self.black_king_pos = (target_col + target_row * 8) as u8;
                     }
 
                     target_col += 1;
                 }
                 'n' => {
-                    self.squares[target_col][target_row] = Some(Piece { piece_type: PieceType::Knight, white_piece: white });
+                    self.squares[target_col + target_row * 8] = Some(Piece { piece_type: PieceType::Knight, white_piece: white });
                     target_col += 1;
                 }
                 'b' => {
-                    self.squares[target_col][target_row] = Some(Piece { piece_type: PieceType::Bishop, white_piece: white });
+                    self.squares[target_col + target_row * 8] = Some(Piece { piece_type: PieceType::Bishop, white_piece: white });
                     target_col += 1;
                 }
                 'r' => {
-                    self.squares[target_col][target_row] = Some(Piece { piece_type: PieceType::Rook, white_piece: white });
+                    self.squares[target_col + target_row * 8] = Some(Piece { piece_type: PieceType::Rook, white_piece: white });
                     target_col += 1;
                 }
                 'q' => {
-                    self.squares[target_col][target_row] = Some(Piece { piece_type: PieceType::Queen, white_piece: white });
+                    self.squares[target_col + target_row * 8] = Some(Piece { piece_type: PieceType::Queen, white_piece: white });
                     target_col += 1;
                 }
                 'p' => {
-                    self.squares[target_col][target_row] = Some(Piece { piece_type: PieceType::Pawn, white_piece: white });
+                    self.squares[target_col + target_row * 8] = Some(Piece { piece_type: PieceType::Pawn, white_piece: white });
                     target_col += 1;
                 }
                 ' ' => {
@@ -263,7 +260,7 @@ impl Board {
             index += 2;
         }
         else {
-            self.game_state.en_passant_square = Some((Board::column_char_to_index(chars[index]).expect("Invalid column letter in FEN string") as u8, chars[index + 1].to_digit(10).expect("Not a valid row index in FEN String") as u8));
+            self.game_state.en_passant_square = Some(Board::column_char_to_index(chars[index]).expect("Invalid column letter in FEN string") as u8 + 8 * chars[index + 1].to_digit(10).expect("Not a valid row index in FEN String") as u8);
             index += 3;
         }
 
@@ -286,29 +283,24 @@ impl Board {
         self.invalidate_caches();
 
         self.game_result = GameResult::NotStarted;
-
-        #[cfg(debug_assertions)]
-        println!("Fen loading time: {}µs", start_time.elapsed().as_micros());
     }
 
     #[allow(unused)]
     pub fn generate_fen(&self) -> String {
-        #[cfg(debug_assertions)]
-        let start_time = std::time::Instant::now();
         let mut fen: String = String::from("");
 
         //Go back to front when switching to a flattened Array due to a wrong color positioning
         for y in 0..8 {
             let mut empty_squares = 0;
             for x in 0..8 {
-                if self.squares[x][y].is_some() {
+                if self.squares[x + (7 - y) * 8].is_some() {
                     if empty_squares != 0 {
                         fen.push_str(&format!("{}", empty_squares));
                     }
 
                     empty_squares = 0;
 
-                    fen.push(Self::piece_to_char(self.squares[x][y].unwrap()).expect(&format!("Invalid piece on square ({}, {})", x, y)));
+                    fen.push(Self::piece_to_char(self.squares[x + (7 - y) * 8].unwrap()).expect(&format!("Invalid piece on square ({}, {})", x, y)));
                 }
                 else {
                     empty_squares += 1;
@@ -357,8 +349,8 @@ impl Board {
         fen.push(' ');
 
         if self.game_state.en_passant_square.is_some() {
-            fen.push(Self::column_index_to_char(self.game_state.en_passant_square.unwrap().0 as i32).expect("Invalid column in en passant square"));
-            fen.push(self.game_state.en_passant_square.unwrap().1.to_string().pop().unwrap());
+            fen.push(Self::column_index_to_char((self.game_state.en_passant_square.unwrap() % 8) as i32).expect("Invalid column in en passant square"));
+            fen.push((self.game_state.en_passant_square.unwrap() / 8).to_string().pop().unwrap());
         }
         else {
             fen.push('-');
@@ -371,9 +363,6 @@ impl Board {
         fen.push(' ');
 
         fen.push_str(self.game_state.next_move_number.to_string().as_str());
-
-        #[cfg(debug_assertions)]
-        println!("Fen generation time: {}µs", start_time.elapsed().as_micros());
 
         fen
     }

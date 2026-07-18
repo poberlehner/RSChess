@@ -1,4 +1,3 @@
-use std::cmp::min;
 use std::time::Duration;
 use crate::board::gamestate::GameResult;
 use crate::board::piece::PieceType;
@@ -9,6 +8,7 @@ use crate::renderer::promotionpopup::PromotionPopup;
 use crate::renderer::Renderer;
 use raylib::consts::MouseButton;
 use raylib::core::RaylibHandle;
+use raylib::drawing::RaylibDrawHandle;
 use raylib::ffi::KeyboardKey::{KEY_LEFT, KEY_R, KEY_S, KEY_T};
 use raylib::prelude::{Color, TraceLogLevel, Vector2};
 use raylib::trace_log;
@@ -24,8 +24,7 @@ impl Renderer {
         }
 
         if rl.is_key_pressed(KEY_S) && board.get_game_result() != GameResult::InProgress {
-            board.start_game(true,
-                TimeControl::Limited(Duration::from_mins(10), Duration::from_mins(10)));
+            board.start_game(TimeControl::Limited(Duration::from_mins(10), Duration::from_mins(10)));
         }
 
         if rl.is_key_pressed(KEY_LEFT) {
@@ -33,9 +32,7 @@ impl Renderer {
         }
 
         if rl.is_key_pressed(KEY_R) {
-            board.invalidate_caches();
-            board.generate_all_bitboards();
-            board.get_legal_moves();
+            self.board_flip = !self.board_flip;
         }
 
         if rl.is_key_pressed(KEY_T) {
@@ -61,7 +58,7 @@ impl Renderer {
 
             if promotion_type.is_some() {
                 self.promotion_move = Some(Move { origin_square: self.promotion_move.unwrap().origin_square, destination_square: self.promotion_move.unwrap().destination_square, promotion_type: promotion_type.unwrap()});
-                board.make_move(self.promotion_move.unwrap());
+                board.make_move(self.promotion_move.unwrap(), false);
 
                 self.promotion_popup = None;
                 self.promotion_move = None;
@@ -75,21 +72,18 @@ impl Renderer {
         }
 
         if self.selected_square.is_some() && !self.active_selection {
-            let square: (u8, u8) = (((mouse_pos.x - board_offset) as u32 / self.square_size) as u8, (mouse_pos.y as u32 / self.square_size) as u8);
+            let square: u8 = self.mouse_pos_to_square_index_rl(&rl) as u8;
             let moves = board.get_legal_moves_for_square(self.selected_square.unwrap());
             let current_move = Move { origin_square: self.selected_square.unwrap(), destination_square: square, promotion_type: PieceType::None };
 
             if moves.contains(&current_move) {
-                board.make_move(current_move);
+                board.make_move(current_move, false);
                 self.selected_square = None;
                 self.active_selection = false;
             }
             else {
                 self.selected_square = Some(
-                    (
-                        ((mouse_pos.x - board_offset) as u32 / self.square_size) as u8,
-                        (mouse_pos.y as u32 / self.square_size) as u8,
-                    )
+                    self.mouse_pos_to_square_index_rl(&rl) as u8
                 );
 
                 self.active_selection = true;
@@ -97,10 +91,7 @@ impl Renderer {
         }
         else {
             self.selected_square = Some(
-                (
-                    ((mouse_pos.x - board_offset) as u32 / self.square_size) as u8,
-                    (mouse_pos.y as u32 / self.square_size) as u8,
-                )
+                self.mouse_pos_to_square_index_rl(&rl) as u8
             );
 
             self.active_selection = true;
@@ -108,10 +99,7 @@ impl Renderer {
     }
 
     fn handle_mouse_button_release(&mut self, board: &mut Board, rl: &mut RaylibHandle) {
-        let mouse_pos = rl.get_mouse_position();
-        let board_offset: f32 = (rl.get_render_width() - self.square_size as i32 * 8) as f32;
-
-        let square: (u8, u8) = (((mouse_pos.x - board_offset) as u32 / self.square_size) as u8, (mouse_pos.y as u32 / self.square_size) as u8);
+        let square: u8 = self.mouse_pos_to_square_index_rl(&rl) as u8;
 
         if self.selected_square.is_none() {
             return;
@@ -121,7 +109,7 @@ impl Renderer {
         let mut current_move = Move { origin_square: self.selected_square.unwrap(), destination_square: square, promotion_type: PieceType::None };
 
         if moves.contains(&current_move) {
-            board.make_move(current_move);
+            board.make_move(current_move, false);
             self.selected_square = None;
             self.active_selection = false;
         }
@@ -129,16 +117,12 @@ impl Renderer {
             //Promotion handling
             current_move.promotion_type = PieceType::Queen;
             if moves.contains(&current_move) {
-                let size = Vector2::new(60f32, 240f32);
-                let position = Vector2 {
-                    x: rl.get_screen_width() as f32 - (self.square_size as i32 * (8i32 - (current_move.origin_square.0 + 1) as i32)) as f32 - (self.square_size as f32 / 2f32),
-                    y: min((self.square_size as i32 * (current_move.origin_square.1 + 1) as i32) - (self.square_size as f32 / 2f32) as i32, rl.get_screen_height() - size.y as i32) as f32
-                };
+                let position = self.square_index_to_pos_rl(&rl, current_move.origin_square as i32);
 
                 self.promotion_popup = Some(PromotionPopup::new(
                     position,
                     Vector2::new(60f32, 240f32),
-                    board.squares[current_move.origin_square.0 as usize][current_move.origin_square.1 as usize]
+                    board.squares[current_move.origin_square as usize]
                         .expect("No piece at the origin of a move (Renderer)").white_piece,
                     Color::WHITE
                 ));
@@ -152,5 +136,73 @@ impl Renderer {
         }
 
         self.active_selection = false;
+    }
+}
+
+//Helper functions
+impl Renderer {
+    pub fn square_index_to_pos(&self, draw_handle: &RaylibDrawHandle, i: i32) -> Vector2 {
+        let mut result: Vector2 = Vector2::zero();
+
+        // result.x = ((draw_handle.get_screen_width() - self.square_size as i32 * 8) as i32 + (i % 8) as i32 * self.square_size as i32) as f32;
+        // result.y = (self.square_size * 7 - i as u32 / 8 * self.square_size) as f32;
+
+        // if self.board_flip {
+        //     result.x = 7f32 - result.x;
+        //     result.y = 7f32 - result.y;
+        // }
+
+        if self.board_flip {
+            result.x = ((draw_handle.get_screen_width() - self.square_size as i32 * 8) + (7 - i % 8) as i32 * self.square_size as i32) as f32;
+            result.y = (self.square_size * 7 - (7 - i as u32 / 8) * self.square_size) as f32;
+        }
+        else {
+            result.x = ((draw_handle.get_screen_width() - self.square_size as i32 * 8) + (i % 8) as i32 * self.square_size as i32) as f32;
+            result.y = (self.square_size * 7 - i as u32 / 8 * self.square_size) as f32;
+        }
+
+        result
+    }
+
+    pub fn square_index_to_pos_rl(&self, rl: &RaylibHandle, i: i32) -> Vector2 {
+        let mut result: Vector2 = Vector2::zero();
+
+        if self.board_flip {
+            result.x = ((rl.get_screen_width() - self.square_size as i32 * 8) + (7 - i % 8) as i32 * self.square_size as i32) as f32;
+            result.y = (self.square_size * 7 - (7 - i as u32 / 8) * self.square_size) as f32;
+        }
+        else {
+            result.x = ((rl.get_screen_width() - self.square_size as i32 * 8) + (i % 8) as i32 * self.square_size as i32) as f32;
+            result.y = (self.square_size * 7 - i as u32 / 8 * self.square_size) as f32;
+        }
+
+        result
+    }
+
+    ///Not capped at 64
+    pub fn mouse_pos_to_square_index(&self, draw_handle: &RaylibDrawHandle) -> i32 {
+        let mut x: i32 = ((draw_handle.get_mouse_x() - (draw_handle.get_screen_width() - self.square_size as i32 * 8))
+                                                                            as f32 / self.square_size as f32) as i32;
+        let mut y: i32 = (self.square_size as i32 * 8 - draw_handle.get_mouse_y()) / self.square_size as i32;
+
+        if self.board_flip {
+            x = 7 - x;
+            y = 7 - y;
+        }
+
+        x + y * 8
+    }
+
+    ///Not capped at 64
+    pub fn mouse_pos_to_square_index_rl(&self, rl: &RaylibHandle) -> i32 {
+        let mut x: i32 = ((rl.get_mouse_x() - (rl.get_screen_width() - self.square_size as i32 * 8)) as f32 / self.square_size as f32) as i32;
+        let mut y: i32 = (self.square_size as i32 * 8 - rl.get_mouse_y()) / self.square_size as i32;
+
+        if self.board_flip {
+            x = 7 - x;
+            y = 7 - y;
+        }
+
+        x + y * 8
     }
 }

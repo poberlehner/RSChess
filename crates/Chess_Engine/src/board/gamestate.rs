@@ -5,7 +5,7 @@ pub struct GameState
     ///white then black, kingside then queenside
     pub castling_rights: [bool; 4],
     ///column, row
-    pub en_passant_square: Option<(u8, u8)>,
+    pub en_passant_square: Option<u8>,
     pub fifty_move_counter: u32,
     pub next_move_number: u32,
 }

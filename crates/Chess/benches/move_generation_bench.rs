@@ -38,7 +38,7 @@ pub fn move_generation_recursive_bench(c: &mut Criterion) {
 
     let mut board: Board = Board::new(None);
 
-    board.start_game(false, TimeControl::Unlimited);
+    board.start_game(TimeControl::Unlimited);
 
     #[allow(non_snake_case)]
     let DEPTH = 3;
@@ -62,8 +62,10 @@ fn recursive_move_generation_bench(board: &mut Board, depth: u32) -> u64 {
     let mut num_positions = 0;
 
     for legal_move in legal_moves {
-        if !board.make_move(legal_move) {
-            println!("Executing move {}{} failed (depth: {})", Board::square_coords_to_chars(legal_move.origin_square).iter().collect::<String>(), Board::square_coords_to_chars(legal_move.destination_square).iter().collect::<String>(), depth);
+        if !board.make_move(legal_move, true) {
+            println!("Executing move {}{} failed (depth: {})",
+                Board::square_index_to_chars(legal_move.origin_square).iter().collect::<String>(),
+                Board::square_index_to_chars(legal_move.destination_square).iter().collect::<String>(), depth);
         }
 
         let num_new_positions = recursive_move_generation_bench(board, depth - 1);

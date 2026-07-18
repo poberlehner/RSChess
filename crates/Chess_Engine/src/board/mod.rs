@@ -8,6 +8,7 @@ mod generalapi;
 pub mod piece;
 mod tests;
 mod zobrist;
+mod precomputation;
 
 use gamestate::GameState;
 use piece::Piece;
@@ -19,12 +20,10 @@ use zobrist::Zobrist;
 
 #[derive(Clone, PartialEq)]
 pub struct Board {
-    pub(super) squares: [[Option<Piece>; 8]; 8],
+    pub(super) squares: [Option<Piece>; 64],
 
     pub(super) game_state: GameState,
     game_result: GameResult,
-    //Limit game end conditions to checkmate for the perft function
-    full_game_end_enforcement: bool,
 
     time_control: TimeControl,
     move_start_time: std::time::Instant,
@@ -34,11 +33,14 @@ pub struct Board {
     zobrist_history: Vec<i64>,
     zobrist: Zobrist,
 
-    white_king_pos: (u8, u8),
-    black_king_pos: (u8, u8),
+    white_king_pos: u8,
+    black_king_pos: u8,
     check: bool,
     white_double_check: Option<bool>,
     black_double_check: Option<bool>,
+
+    distance_to_edge: [[u8; 8]; 64],
+    knight_jump_legality: [[bool; 8]; 64],
 
     pub(super) legal_moves: Option<Vec<Move>>,
 
