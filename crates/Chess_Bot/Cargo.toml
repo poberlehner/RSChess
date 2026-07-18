@@ -1,0 +1,8 @@
+[package]
+name = "chess_bot"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chess_engine = { path = "../Chess_Engine" }
+rand = "0.10.2"

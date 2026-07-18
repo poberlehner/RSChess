@@ -15,20 +15,22 @@ use raylib::trace_log;
 
 //Interface functions
 impl Renderer {
-    pub fn update_gui(&mut self, board: &mut Board, rl: &mut RaylibHandle) {
+    /// allow_moving: wether to allow the user to make moves
+    pub fn update_gui(&mut self, board: &mut Board, rl: &mut RaylibHandle, allow_moving: bool) {
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
-            self.handle_mouse_button_press(board, rl);
+            self.handle_mouse_button_press(allow_moving, board, rl);
         }
         else if rl.is_mouse_button_released(MouseButton::MOUSE_BUTTON_LEFT) {
            self.handle_mouse_button_release(board, rl);
         }
 
         if rl.is_key_pressed(KEY_S) && board.get_game_result() != GameResult::InProgress {
+            board.load_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
             board.start_game(TimeControl::Limited(Duration::from_mins(10), Duration::from_mins(10)));
         }
 
         if rl.is_key_pressed(KEY_LEFT) {
-            board.undo_move();
+            board.undo_move(false);
         }
 
         if rl.is_key_pressed(KEY_R) {
@@ -43,9 +45,13 @@ impl Renderer {
 
 //Functions to split up the UI logic
 impl Renderer {
-    fn handle_mouse_button_press(&mut self, board: &mut Board, rl: &mut RaylibHandle) {
+    fn handle_mouse_button_press(&mut self, allow_moving: bool, board: &mut Board, rl: &mut RaylibHandle) {
         let mouse_pos = rl.get_mouse_position();
         let board_offset: f32 = (rl.get_render_width() - self.square_size as i32 * 8) as f32;
+
+        if !allow_moving {
+            return;
+        }
 
         if !((mouse_pos.x > board_offset) && (mouse_pos.x < (board_offset + self.square_size as f32 * 8.0) && mouse_pos.y < self.square_size as f32 * 8.0)) {
             self.selected_square = None;

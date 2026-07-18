@@ -1,3 +1,4 @@
+use chess_engine::board::gamestate::GameResult;
 use chess_engine::board::utilities::TimeControl;
 use chrono::prelude::*;
 use raylib::core::RaylibHandle;
@@ -61,8 +62,6 @@ fn custom_panic_hook(panic_info: &PanicHookInfo) {
          log_file.write(["[".as_bytes(), time_str.as_bytes(), "] : ".as_bytes(), panic_info.payload_as_str().expect("Failed to get panic info as string").as_bytes(), "\n".as_bytes()].concat().as_ref()).expect("Failed to write to log file");
      }
 }
-
-//TODO: Change the game end rule enforcement system in the Board class to allow searches without game end enforcement to happen in normal games
 
 pub struct BotController {
     raylib_handle: RaylibHandle,
@@ -143,7 +142,7 @@ impl BotController {
         self.board.start_game(TimeControl::Unlimited);
     }
 
-    pub fn run(&mut self) {
+    pub fn run_human_vs_bot(&mut self) {
         while !self.raylib_handle.window_should_close() {
             if self.raylib_handle.is_key_down(KeyboardKey::KEY_LEFT_SHIFT) || self.raylib_handle.is_key_down(KeyboardKey::KEY_RIGHT_SHIFT) {
                 if self.raylib_handle.is_key_pressed(KeyboardKey::KEY_F) {
@@ -153,10 +152,72 @@ impl BotController {
 
             let allow_moving = self.board.get_white_to_move() != self.bot_color_white;
             self.renderer.update_gui(&mut self.board, &mut self.raylib_handle, allow_moving);
-            
-            if self.board.get_white_to_move() == self.bot_color_white {
-                self.bot.play_move(&mut self.board);
+
+            if self.board.get_white_to_move() == self.bot_color_white && self.board.get_game_result() == GameResult::InProgress {
+                let m = self.bot.get_best_move(&mut self.board);
+                self.board.make_move(m, false);
             }
+
+            let mut draw_handle = self.raylib_handle.begin_drawing(&self.raylib_thread);
+            draw_handle.clear_background(Color::BLACK);
+
+            self.renderer.draw_board(&mut draw_handle);
+
+            self.renderer.draw_pieces(&mut self.board, &mut draw_handle);
+            self.renderer.draw_moves(&mut self.board, Color { r: 128, g: 128, b: 128, a: 155}, None, &mut draw_handle);
+
+            self.board.get_legal_moves();
+
+            self.renderer.draw_keyboard_shortcut_tips(&mut self.board, &mut draw_handle);
+
+            draw_handle.draw_fps(20, 20);
+        }
+
+        self.renderer.unload_textures();
+    }
+
+    pub fn run_bot_vs_bot(&mut self) {
+        while !self.raylib_handle.window_should_close() {
+            if self.raylib_handle.is_key_down(KeyboardKey::KEY_LEFT_SHIFT) || self.raylib_handle.is_key_down(KeyboardKey::KEY_RIGHT_SHIFT) {
+                if self.raylib_handle.is_key_pressed(KeyboardKey::KEY_F) {
+                    self.raylib_handle.toggle_fullscreen();
+                }
+            }
+
+            self.renderer.update_gui(&mut self.board, &mut self.raylib_handle, false);
+
+            if self.board.get_game_result() == GameResult::InProgress {
+                let m = self.bot.get_best_move(&mut self.board);
+                self.board.make_move(m, false);
+            }
+
+            let mut draw_handle = self.raylib_handle.begin_drawing(&self.raylib_thread);
+            draw_handle.clear_background(Color::BLACK);
+
+            self.renderer.draw_board(&mut draw_handle);
+
+            self.renderer.draw_pieces(&mut self.board, &mut draw_handle);
+            self.renderer.draw_moves(&mut self.board, Color { r: 128, g: 128, b: 128, a: 155}, None, &mut draw_handle);
+
+            self.board.get_legal_moves();
+
+            self.renderer.draw_keyboard_shortcut_tips(&mut self.board, &mut draw_handle);
+
+            draw_handle.draw_fps(20, 20);
+        }
+
+        self.renderer.unload_textures();
+    }
+
+    pub fn run_human_vs_human(&mut self) {
+        while !self.raylib_handle.window_should_close() {
+            if self.raylib_handle.is_key_down(KeyboardKey::KEY_LEFT_SHIFT) || self.raylib_handle.is_key_down(KeyboardKey::KEY_RIGHT_SHIFT) {
+                if self.raylib_handle.is_key_pressed(KeyboardKey::KEY_F) {
+                    self.raylib_handle.toggle_fullscreen();
+                }
+            }
+
+            self.renderer.update_gui(&mut self.board, &mut self.raylib_handle, true);
 
             let mut draw_handle = self.raylib_handle.begin_drawing(&self.raylib_thread);
             draw_handle.clear_background(Color::BLACK);

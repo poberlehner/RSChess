@@ -184,7 +184,7 @@ impl Board {
                         let row_in_front = if piece.white_piece { i + 8 } else { i - 8 };
 
                         if self.squares[row_in_front].is_none() {
-                            if row_in_front > 7 && row_in_front <= 55 {
+                            if row_in_front > 7 && row_in_front < 55 {
                                 self.add_move(i as u8, row_in_front as u8, PieceType::None, white, pinned_orthogonal, pinned_diagonal, check, &mut moves);
                             }
 
@@ -197,7 +197,7 @@ impl Board {
                             }
 
                             //Promotions
-                            if row_in_front <= 7 || row_in_front >= 55 {
+                            if row_in_front <= 7 || row_in_front > 55 {
                                 self.add_move(i as u8, row_in_front as u8, PieceType::Bishop, white, pinned_orthogonal, pinned_diagonal, check, &mut moves);
                                 self.add_move(i as u8, row_in_front as u8, PieceType::Knight, white, pinned_orthogonal, pinned_diagonal, check, &mut moves);
                                 self.add_move(i as u8, row_in_front as u8, PieceType::Queen, white, pinned_orthogonal, pinned_diagonal, check, &mut moves);
@@ -221,7 +221,8 @@ impl Board {
                             }
                             else {
                                 if self.game_state.en_passant_square.is_some() &&
-                                (self.game_state.en_passant_square.unwrap() as i8 - I == -7 || self.game_state.en_passant_square.unwrap() as i8 - I == 9) {
+                                    ((self.game_state.en_passant_square.unwrap() as i8 - I == 9 && self.game_state.white_to_move) ||
+                                    (self.game_state.en_passant_square.unwrap() as i8 - I == -7 && !self.game_state.white_to_move)) {
                                     if 1 << i & self.get_en_passant_pin_bitboard(white) == 0 {
                                         self.add_move(i as u8, (row_in_front + 1) as u8, PieceType::None, white, pinned_orthogonal, pinned_diagonal, check, &mut moves);
                                     }
@@ -231,7 +232,7 @@ impl Board {
                         if i % 8 != 0 {
                             if self.squares[row_in_front - 1].is_some() {
                                 if self.squares[row_in_front - 1].unwrap().white_piece != self.squares[i].unwrap().white_piece {
-                                    if row_in_front <= 7 || row_in_front >= 55 {
+                                    if row_in_front <= 7 || row_in_front > 55 {
                                         self.add_move(i as u8, (row_in_front - 1) as u8, PieceType::Queen, white, pinned_orthogonal, pinned_diagonal, check, &mut moves);
                                         self.add_move(i as u8, (row_in_front - 1) as u8, PieceType::Rook, white, pinned_orthogonal, pinned_diagonal, check, &mut moves);
                                         self.add_move(i as u8, (row_in_front - 1) as u8, PieceType::Knight, white, pinned_orthogonal, pinned_diagonal, check, &mut moves);
@@ -243,8 +244,10 @@ impl Board {
                                 }
                             }
                             else {
+                                //TODO: Seperate white and black conditions
                                 if self.game_state.en_passant_square.is_some() &&
-                                (self.game_state.en_passant_square.unwrap() as i8 - I == 7 || self.game_state.en_passant_square.unwrap() as i8 - I == -9) {
+                                    ((self.game_state.en_passant_square.unwrap() as i8 - I == 7 && self.game_state.white_to_move) ||
+                                    (self.game_state.en_passant_square.unwrap() as i8 - I == -9 && !self.game_state.white_to_move)) {
                                     if 1 << i & self.get_en_passant_pin_bitboard(white) == 0 {
                                         self.add_move(i as u8, (row_in_front - 1) as u8, PieceType::None, white, pinned_orthogonal, pinned_diagonal, check, &mut moves);
                                     }

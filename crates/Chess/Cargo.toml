@@ -7,6 +7,7 @@ edition = "2024"
 raylib = "6.0.0"
 chrono = "0.4.44"
 chess_engine = { path = "../Chess_Engine" }
+bot_controller = { path = "../Bot_Controller"}
 
 [dev-dependencies]
 criterion = "0.8.2"

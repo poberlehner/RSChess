@@ -14,8 +14,11 @@ impl Board {
     ///returns: success
     pub fn make_move(&mut self, m: Move, in_search: bool) -> bool {
         if self.game_result != GameResult::InProgress {
-            println!("The game is not running");
-            println!("Game Result: {:?}", self.game_result);
+            if !in_search {
+                println!("The game is not running");
+                println!("Game Result: {:?}", self.game_result);
+            }
+
             return false;
         }
 
@@ -138,7 +141,7 @@ impl Board {
         true
     }
 
-    pub fn undo_move(&mut self) -> Option<LogMove> {
+    pub fn undo_move(&mut self, _in_search: bool) -> Option<LogMove> {
         if self.move_log.is_empty() {
             return None;
         }
@@ -152,7 +155,9 @@ impl Board {
         let last = self.move_log.pop().unwrap();
         let piece = self.squares[last.destination_square as usize].expect("Invalid logged move");
 
-        self.zobrist_history.pop();
+        if self.game_result != GameResult::BlackIsMated && self.game_result != GameResult::WhiteIsMated {
+            self.zobrist_history.pop();
+        }
 
         if piece.piece_type == PieceType::King {
             if piece.white_piece {
@@ -226,11 +231,18 @@ impl Board {
 
     pub fn start_game(&mut self, time_control: TimeControl) {
         if self.game_result != GameResult::InProgress {
+            self.invalidate_caches();
+            self.zobrist_history.clear();
+            self.check = false;
+            self.move_log.clear();
+            self.move_start_time = Instant::now();
+
             self.game_result = GameResult::InProgress;
 
             self.time_control = time_control;
             self.white_used_time = Duration::new(0, 0);
             self.black_used_time = Duration::new(0, 0);
+
         }
     }
 
@@ -239,6 +251,13 @@ impl Board {
     pub fn get_time_control(&self) -> TimeControl { self.time_control }
 
     pub fn get_white_to_move(&self) -> bool { self.game_state.white_to_move }
+
+    ///White then black, kingside then queenside
+    pub fn get_castling_rights(&self) -> [bool; 4] { self.game_state.castling_rights }
+
+    pub fn get_squares(&self) -> [Option<Piece>; 64] { self.squares }
+
+    pub fn get_piece(&self, index: usize) -> Option<Piece> { self.squares[index] }
 
     ///Returns 0 when time_control is unlimited
     pub fn get_time_left(&self, white: bool) -> Duration {
@@ -273,6 +292,28 @@ impl Board {
                 return Duration::new(0, 0);
             }
         }
+    }
+
+    ///0 == Draw; 1 = White won; 2 = Black won; -1 = Game not finished
+    pub fn get_game_result_simplified(&self) -> i32 {
+        return match self.game_result {
+            GameResult::BlackIsMated  => { 1 }
+            GameResult::BlackTimeout  => { 1 }
+            GameResult::WhiteIsMated  => { 2 }
+            GameResult::WhiteTimeout  => { 2 }
+            GameResult::InProgress    => {-1 }
+            GameResult::NotStarted    => {-1 }
+            GameResult::InsufficientMaterial => { 0 }
+            GameResult::FiftyMoveRule => { 0 }
+            _ => {
+                0
+            }
+        }
+    }
+
+    pub fn get_move_history(&self) -> String {
+        //TODO
+        return " ".to_string();
     }
 
     pub fn invalidate_caches(&mut self) {
@@ -468,6 +509,27 @@ impl Board {
             }
         }
 
+        //Handle repetition
+        {
+            self.zobrist_history.push(self.zobrist.generate_key(&self));
+
+            let mut equals: i32 = 0;
+            for i in 0..self.zobrist_history.len() - 1 {
+                if self.zobrist_history[i] == self.zobrist_history[self.zobrist_history.len() - 1] {
+                    equals += 1;
+                }
+            }
+
+            if equals >= 2 {
+                self.game_result = GameResult::Repetition;
+
+                if !in_search {
+                    println!("{blue}Draw due to repetition{reset}");
+                    trace_log(LOG_INFO, "Draw due to repetition");
+                }
+            }
+        }
+
         if !in_search {
             if self.game_state.fifty_move_counter == 50 {
                 self.game_result = GameResult::FiftyMoveRule;
@@ -485,26 +547,8 @@ impl Board {
             //Handle Stalemate
             if self.get_legal_moves().as_ref().unwrap().is_empty() {
                 self.game_result = GameResult::Stalemate;
-                println!("{reset}Draw due to stalemate{reset}");
+                println!("{blue}Draw due to stalemate{reset}");
                 trace_log(LOG_INFO, "Draw due to stalemate");
-            }
-
-            //Handle repetition
-            {
-                self.zobrist_history.push(self.zobrist.generate_key(&self));
-
-                let mut equals: i32 = 0;
-                for i in 0..self.zobrist_history.len() - 1 {
-                    if self.zobrist_history[i] == self.zobrist_history[self.zobrist_history.len() - 1] {
-                        equals += 1;
-                    }
-                }
-
-                if equals >= 2 {
-                    self.game_result = GameResult::Repetition;
-                    println!("{blue}Draw due to repetition{reset}");
-                    trace_log(LOG_INFO, "Draw due to repetition");
-                }
             }
         }
     }

@@ -1,1 +1,4 @@
 /target
+/.zed
+Cargo.lock
+/assets/Chess.log

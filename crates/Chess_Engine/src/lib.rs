@@ -1,5 +1,6 @@
 pub mod board;
 pub mod renderer;
+pub mod bot;
 
 #[cfg(test)]
 mod tests {
@@ -77,7 +78,7 @@ mod tests {
             }
 
             // undo_move_log.push((board.undo_move().unwrap(), max_depth - depth));
-            board.undo_move();
+            board.undo_move(true);
 
             // board.invalidate_caches();
             // board_clone.invalidate_caches();

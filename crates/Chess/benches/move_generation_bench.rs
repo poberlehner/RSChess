@@ -71,7 +71,7 @@ fn recursive_move_generation_bench(board: &mut Board, depth: u32) -> u64 {
         let num_new_positions = recursive_move_generation_bench(board, depth - 1);
         num_positions += num_new_positions;
 
-        board.undo_move();
+        board.undo_move(true);
     }
 
     num_positions
