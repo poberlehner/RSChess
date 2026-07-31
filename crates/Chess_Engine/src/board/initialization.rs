@@ -2,6 +2,7 @@ use crate::board::gamestate::{GameResult, GameState};
 use crate::board::Board;
 use crate::board::utilities::TimeControl::Unlimited;
 use crate::board::zobrist::Zobrist;
+use chrono::Local;
 use raylib::callbacks::TraceLogLevel;
 use raylib::core::RaylibHandle;
 use std::time::{Duration, Instant};
@@ -49,6 +50,8 @@ impl Board {
             knight_jump_legality: [[false; 8]; 64],
 
             move_log: vec![],
+            start_fen: String::from(""),
+            game_start_time: Local::now(),
 
             white_attacked_squares_bitboard: None,
             black_attacked_squares_bitboard: None,

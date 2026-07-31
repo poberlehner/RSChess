@@ -42,6 +42,7 @@ pub struct LogMove {
 }
 
 impl Move {
+    ///Unaware of castling as that is handled by the make_move function
     pub fn to_string(&self) -> String {
         let mut string: String = String::from("");
 
@@ -58,5 +59,15 @@ impl Move {
         }
 
         string
+    }
+}
+
+impl LogMove {
+    pub fn to_move(&self) -> Move {
+        return Move {
+            origin_square: self.origin_square,
+            destination_square: self.destination_square,
+            promotion_type: self.promotion_type
+        }
     }
 }

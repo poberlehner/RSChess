@@ -1,6 +1,6 @@
+use chrono::{Datelike, Local, Timelike};
 use raylib::ffi::TraceLogLevel::LOG_INFO;
 use raylib::trace_log;
-
 use crate::board::gamestate::GameResult;
 use crate::board::piece::{Piece, PieceType};
 use crate::board::r#move::{LogMove, Move};
@@ -236,6 +236,7 @@ impl Board {
             self.check = false;
             self.move_log.clear();
             self.move_start_time = Instant::now();
+            self.game_start_time = Local::now();
 
             self.game_result = GameResult::InProgress;
 
@@ -262,29 +263,29 @@ impl Board {
     ///Returns 0 when time_control is unlimited
     pub fn get_time_left(&self, white: bool) -> Duration {
         match self.time_control {
-            TimeControl::Limited(white_time, black_time) => {
+            TimeControl::Limited(time, _) => {
                 if white {
                     if self.game_state.white_to_move {
-                        if self.move_start_time.elapsed() > white_time - self.white_used_time {
+                        if self.move_start_time.elapsed() > time - self.white_used_time {
                             return Duration::new(0, 0);
                         }
 
-                        white_time - self.white_used_time - self.move_start_time.elapsed()
+                        time - self.white_used_time - self.move_start_time.elapsed()
                     }
                     else {
-                        white_time - self.white_used_time
+                        time - self.white_used_time
                     }
                 }
                 else {
                     if self.game_state.white_to_move {
-                        black_time - self.black_used_time
+                        time - self.black_used_time
                     }
                     else {
-                        if self.move_start_time.elapsed() > black_time - self.black_used_time {
+                        if self.move_start_time.elapsed() > time - self.black_used_time {
                             return Duration::new(0, 0);
                         }
 
-                        black_time - self.black_used_time - self.move_start_time.elapsed()
+                        time - self.black_used_time - self.move_start_time.elapsed()
                     }
                 }
             }
@@ -297,14 +298,14 @@ impl Board {
     ///0 == Draw; 1 = White won; 2 = Black won; -1 = Game not finished
     pub fn get_game_result_simplified(&self) -> i32 {
         return match self.game_result {
-            GameResult::BlackIsMated  => { 1 }
-            GameResult::BlackTimeout  => { 1 }
-            GameResult::WhiteIsMated  => { 2 }
-            GameResult::WhiteTimeout  => { 2 }
-            GameResult::InProgress    => {-1 }
-            GameResult::NotStarted    => {-1 }
+            GameResult::BlackIsMated         => { 1 }
+            GameResult::BlackTimeout         => { 1 }
+            GameResult::WhiteIsMated         => { 2 }
+            GameResult::WhiteTimeout         => { 2 }
+            GameResult::InProgress           => {-1 }
+            GameResult::NotStarted           => {-1 }
             GameResult::InsufficientMaterial => { 0 }
-            GameResult::FiftyMoveRule => { 0 }
+            GameResult::FiftyMoveRule        => { 0 }
             _ => {
                 0
             }
@@ -312,8 +313,80 @@ impl Board {
     }
 
     pub fn get_move_history(&self) -> String {
-        //TODO
-        return " ".to_string();
+        let mut result = "".to_string();
+
+        for m in self.move_log.iter() {
+            if !m.castling {
+                result.push_str(&m.to_move().to_string());
+            }
+            else {
+                if m.destination_square % 8 == 2 {
+                    result.push_str("0-0-0");
+                }
+                else {
+                    result.push_str("0-0");
+                }
+            }
+
+            result.push(' ');
+        }
+
+        result.push_str(
+            match self.get_game_result_simplified() {
+            -1 => { "*" }
+            0  => { "1/2-1/2" }
+            1  => { "1-0" }
+            2  => { "0-1" }
+            _  => { "" }
+        });
+
+        result
+    }
+
+    ///Competitors are white then black
+    pub fn get_pgn(&self, event: Option<&str>, competitors: Option<(&str, &str)>, round: Option<&str>, ) -> String {
+        let mut result = "".to_string();
+
+        result.push_str("[Event \"");
+        result.push_str(&format!("{}", event.unwrap_or("-")));
+        result.push_str("\"]\n");
+
+        result.push_str("[Site \"Chess\"]\n");
+
+        result.push_str(&format!("[Date \"{}.{}.{}\"]\n",
+            self.game_start_time.year(), self.game_start_time.month(), self.game_start_time.day()));
+        result.push_str(&format!("[Time \"{}:{}:{}\"]\n",
+            self.game_start_time.hour(), self.game_start_time.minute(), self.game_start_time.second()));
+
+        result.push_str(&format!("[FEN \"{}\"]\n", self.start_fen));
+
+        match self.time_control {
+            TimeControl::Unlimited => { }
+            TimeControl::Limited(time, increment) => {
+                result.push_str(&format!("[TimeControl \"{}+{:.1}\"]\n", time.as_secs(), increment.as_secs_f32()));
+            }
+        }
+
+        result.push_str(&format!("[Round \"{}\"]\n", round.unwrap_or("?")));
+
+        result.push_str(&format!("[White \"{}\"]\n", competitors.unwrap_or(("-", "-")).0));
+        result.push_str(&format!("[Black \"{}\"]\n", competitors.unwrap_or(("-", "-")).1));
+
+        if self.get_game_result_simplified() != -1 {
+            result.push_str("[Result \"");
+            result.push_str(
+                match self.get_game_result_simplified() {
+                0  => { "1/2-1/2" }
+                1  => { "1-0" }
+                2  => { "0-1" }
+                _  => { "" }
+            });
+            result.push_str("\"]\n");
+        }
+
+        result.push_str(&self.get_move_history());
+
+        result
     }
 
     pub fn invalidate_caches(&mut self) {
@@ -595,31 +668,31 @@ impl Board {
     //Returns true if there is time left
     fn handle_time(&mut self) -> bool {
         match self.time_control {
-            TimeControl::Limited(white, black) => {
+            TimeControl::Limited(time, increment) => {
                 let blue = "\x1b[34m";     // Blue text
                 let reset = "\x1b[0m";     // Reset to default
 
                 if self.game_state.white_to_move {
-                    self.white_used_time += self.move_start_time.elapsed();
+                    self.white_used_time += self.move_start_time.elapsed() - increment;
                 }
                 else {
-                    self.black_used_time += self.move_start_time.elapsed();
+                    self.black_used_time += self.move_start_time.elapsed() - increment;
                 }
 
-                if self.white_used_time > white {
-                    self.white_used_time = white;
+                if self.white_used_time > time {
+                    self.white_used_time = time;
                 }
-                if self.black_used_time > black {
-                    self.black_used_time = black;
+                if self.black_used_time > time {
+                    self.black_used_time = time;
                 }
 
-                if self.white_used_time >= white {
+                if self.white_used_time >= time {
                     self.game_result = GameResult::WhiteTimeout;
                     println!("{blue}Black won by white Timeout{reset}");
                     trace_log(LOG_INFO, "Black won by white Timeout");
                     return false;
                 }
-                if self.black_used_time >= black {
+                if self.black_used_time >= time {
                     self.game_result = GameResult::BlackTimeout;
                     println!("{blue}White won by black Timeout{reset}");
                     trace_log(LOG_INFO, "White won by black Timeout");

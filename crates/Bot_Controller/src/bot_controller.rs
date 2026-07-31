@@ -3,6 +3,8 @@ use chess_engine::board::utilities::TimeControl;
 use chrono::prelude::*;
 use raylib::core::RaylibHandle;
 use raylib::ffi::GetRandomValue;
+use raylib::ffi::GuiControl::DEFAULT;
+use raylib::ffi::GuiDefaultProperty::TEXT_SIZE;
 use raylib::prelude::*;
 use std::env;
 use std::fs::*;
@@ -93,6 +95,8 @@ impl BotController {
             .msaa_4x()
             .build();
 
+        rl.gui_set_style(DEFAULT, TEXT_SIZE, 20);
+
         set_trace_log_callback(custom_trace_log_callback).expect("Unable to set custom logging functions");
 
         panic::set_hook(Box::new(custom_panic_hook));
@@ -151,7 +155,6 @@ impl BotController {
             }
 
             let allow_moving = self.board.get_white_to_move() != self.bot_color_white;
-            self.renderer.update_gui(&mut self.board, &mut self.raylib_handle, allow_moving);
 
             if self.board.get_white_to_move() == self.bot_color_white && self.board.get_game_result() == GameResult::InProgress {
                 let m = self.bot.get_best_move(&mut self.board);
@@ -170,6 +173,8 @@ impl BotController {
 
             self.renderer.draw_keyboard_shortcut_tips(&mut self.board, &mut draw_handle);
 
+            self.renderer.update_gui(&mut self.board, &mut draw_handle, allow_moving);
+
             draw_handle.draw_fps(20, 20);
         }
 
@@ -183,8 +188,6 @@ impl BotController {
                     self.raylib_handle.toggle_fullscreen();
                 }
             }
-
-            self.renderer.update_gui(&mut self.board, &mut self.raylib_handle, false);
 
             if self.board.get_game_result() == GameResult::InProgress {
                 let m = self.bot.get_best_move(&mut self.board);
@@ -203,6 +206,8 @@ impl BotController {
 
             self.renderer.draw_keyboard_shortcut_tips(&mut self.board, &mut draw_handle);
 
+            self.renderer.update_gui(&mut self.board, &mut draw_handle, false);
+
             draw_handle.draw_fps(20, 20);
         }
 
@@ -217,8 +222,6 @@ impl BotController {
                 }
             }
 
-            self.renderer.update_gui(&mut self.board, &mut self.raylib_handle, true);
-
             let mut draw_handle = self.raylib_handle.begin_drawing(&self.raylib_thread);
             draw_handle.clear_background(Color::BLACK);
 
@@ -230,6 +233,8 @@ impl BotController {
             self.board.get_legal_moves();
 
             self.renderer.draw_keyboard_shortcut_tips(&mut self.board, &mut draw_handle);
+
+            self.renderer.update_gui(&mut self.board, &mut draw_handle, true);
 
             draw_handle.draw_fps(20, 20);
         }

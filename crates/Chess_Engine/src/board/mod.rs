@@ -10,6 +10,7 @@ mod tests;
 mod zobrist;
 mod precomputation;
 
+use chrono::{DateTime, Local};
 use gamestate::GameState;
 use piece::Piece;
 use r#move::Move;
@@ -45,6 +46,8 @@ pub struct Board {
     pub(super) legal_moves: Option<Vec<Move>>,
 
     move_log: Vec<LogMove>,
+    start_fen: String,
+    game_start_time: DateTime<Local>,
 
     white_pieces_bitboard: Option<i64>,
     black_pieces_bitboard: Option<i64>,

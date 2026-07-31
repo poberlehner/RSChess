@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-raylib = "6.0.0"
+raylib = { version = "6.0.0", features = ["raygui"] }
 chess_engine = { path = "../Chess_Engine" }
 chess_bot = { path = "../Chess_Bot" }
 chrono = "0.4.45"

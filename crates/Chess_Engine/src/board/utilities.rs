@@ -7,7 +7,7 @@ use std::time::Duration;
 pub enum TimeControl
 {
     Unlimited,
-    ///Duration for white then black
+    ///Time then increment
     Limited(Duration, Duration),
 }
 
@@ -147,6 +147,7 @@ impl Board {
     }
 
     pub fn load_fen(&mut self, fen: &str) {
+        self.start_fen = fen.to_string();
         self.squares = [None; 64];
 
         self.game_state.castling_rights = [false; 4];

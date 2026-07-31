@@ -26,6 +26,8 @@ pub struct Renderer
     promotion_popup: Option<PromotionPopup>,
     promotion_move: Option<Move>,
 
+    pgn_print_button: Rectangle,
+
     //white the black
     //Pawn, Knight, Bishop, Rook, Queen, King
     textures: Option<[Texture2D; 12]>,
@@ -33,12 +35,12 @@ pub struct Renderer
 
 impl Renderer
 {
-    pub fn new(raylib_handle: &mut RaylibHandle, thread: &RaylibThread,
+    pub fn new(rl: &mut RaylibHandle, thread: &RaylibThread,
                texture_atlas_path: String, square_size: u32, black_square_color: Color,
                white_square_color: Color) -> Self
     {
         let renderer: Renderer = Renderer {
-            textures: Some(Self::load_piece_textures(raylib_handle, thread, texture_atlas_path, 334)),
+            textures: Some(Self::load_piece_textures(rl, thread, texture_atlas_path, 334)),
             square_size,
 
             selected_square: None,
@@ -48,6 +50,8 @@ impl Renderer
 
             promotion_popup: None,
             promotion_move: None,
+
+            pgn_print_button: Rectangle::new(400f32, 20f32, 200f32, 100f32),
 
             black_square_color,
             white_square_color,

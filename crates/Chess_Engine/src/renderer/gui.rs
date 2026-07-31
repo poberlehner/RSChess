@@ -11,12 +11,13 @@ use raylib::core::RaylibHandle;
 use raylib::drawing::RaylibDrawHandle;
 use raylib::ffi::KeyboardKey::{KEY_LEFT, KEY_R, KEY_S, KEY_T};
 use raylib::prelude::{Color, TraceLogLevel, Vector2};
+use raylib::rgui::RaylibGuiControls;
 use raylib::trace_log;
 
 //Interface functions
 impl Renderer {
     /// allow_moving: wether to allow the user to make moves
-    pub fn update_gui(&mut self, board: &mut Board, rl: &mut RaylibHandle, allow_moving: bool) {
+    pub fn update_gui(&mut self, board: &mut Board, rl: &mut RaylibDrawHandle, allow_moving: bool) {
         if rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT) {
             self.handle_mouse_button_press(allow_moving, board, rl);
         }
@@ -26,7 +27,7 @@ impl Renderer {
 
         if rl.is_key_pressed(KEY_S) && board.get_game_result() != GameResult::InProgress {
             board.load_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-            board.start_game(TimeControl::Limited(Duration::from_mins(10), Duration::from_mins(10)));
+            board.start_game(TimeControl::Limited(Duration::from_mins(10), Duration::from_millis(1000)));
         }
 
         if rl.is_key_pressed(KEY_LEFT) {
@@ -40,12 +41,14 @@ impl Renderer {
         if rl.is_key_pressed(KEY_T) {
             board.test_fen_string_handling();
         }
+
+        self.handle_gui_buttons(board, rl);
     }
 }
 
 //Functions to split up the UI logic
 impl Renderer {
-    fn handle_mouse_button_press(&mut self, allow_moving: bool, board: &mut Board, rl: &mut RaylibHandle) {
+    fn handle_mouse_button_press(&mut self, allow_moving: bool, board: &mut Board, rl: &mut RaylibDrawHandle) {
         let mouse_pos = rl.get_mouse_position();
         let board_offset: f32 = (rl.get_render_width() - self.square_size as i32 * 8) as f32;
 
@@ -104,7 +107,7 @@ impl Renderer {
         }
     }
 
-    fn handle_mouse_button_release(&mut self, board: &mut Board, rl: &mut RaylibHandle) {
+    fn handle_mouse_button_release(&mut self, board: &mut Board, rl: &mut RaylibDrawHandle) {
         let square: u8 = self.mouse_pos_to_square_index_rl(&rl) as u8;
 
         if self.selected_square.is_none() {
@@ -143,6 +146,14 @@ impl Renderer {
 
         self.active_selection = false;
     }
+
+    fn handle_gui_buttons(&mut self, board: &mut Board, rl: &mut RaylibDrawHandle) {
+        let pressed = rl.gui_label_button(self.pgn_print_button, "Get PGN");
+
+        if pressed {
+            println!("{}", board.get_pgn(None, None, None));
+        }
+    }
 }
 
 //Helper functions
@@ -170,7 +181,7 @@ impl Renderer {
         result
     }
 
-    pub fn square_index_to_pos_rl(&self, rl: &RaylibHandle, i: i32) -> Vector2 {
+    pub fn square_index_to_pos_rl(&self, rl: &RaylibDrawHandle, i: i32) -> Vector2 {
         let mut result: Vector2 = Vector2::zero();
 
         if self.board_flip {

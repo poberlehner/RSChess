@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-raylib = "6.0.0"
+raylib = { version = "6.0.0", features= ["raygui", "default"] }
 rand = "0.10.2"
+chrono = "0.4.45"
