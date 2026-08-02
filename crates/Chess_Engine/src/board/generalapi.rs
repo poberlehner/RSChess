@@ -604,7 +604,7 @@ impl Board {
         }
 
         if !in_search {
-            if self.game_state.fifty_move_counter == 50 {
+            if self.game_state.fifty_move_counter == 100 {
                 self.game_result = GameResult::FiftyMoveRule;
                 println!("{blue}Draw by the fifty-move rule{reset}");
                 trace_log(LOG_INFO, "Draw by the fifty-move rule");

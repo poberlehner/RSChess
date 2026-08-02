@@ -9,7 +9,6 @@ fn main() {
     app.run_human_vs_human();
 }
 
-//TDOO: Fix the fifty move rule kicking in too early
 //TODO: Replace is_some with bitboard checks
 //TODO: Implement piece lists in the board struct to allow for faster evaluation
 //TODO: Use multithreading to prevent lag while the Bot is calculating
