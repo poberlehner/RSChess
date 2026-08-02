@@ -6,9 +6,8 @@ fn main() {
     let mut app: BotController = BotController::new();
     println!("Starting time:  {:?}", start_time.elapsed());
 
-    app.run_human_vs_human();
+    app.run_bot_vs_bot();
 }
 
 //TODO: Replace is_some with bitboard checks
 //TODO: Implement piece lists in the board struct to allow for faster evaluation
-//TODO: Use multithreading to prevent lag while the Bot is calculating

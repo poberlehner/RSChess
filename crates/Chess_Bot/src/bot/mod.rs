@@ -1,10 +1,10 @@
 use std::panic;
-
 use chess_engine::board::r#move::Move;
 use chess_engine::bot::ChessBot;
 use chess_engine::board::Board;
 use rand::random;
 
+#[derive(Clone, Copy)]
 pub struct Bot {
     piece_values: [i32; 6],
     node_count: i64,

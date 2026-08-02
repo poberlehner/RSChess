@@ -1,4 +1,5 @@
 use chess_engine::board::gamestate::GameResult;
+use chess_engine::board::r#move::Move;
 use chess_engine::board::utilities::TimeControl;
 use chrono::prelude::*;
 use raylib::core::RaylibHandle;
@@ -12,6 +13,8 @@ use std::io::Write;
 use std::panic;
 use std::panic::PanicHookInfo;
 use std::path::PathBuf;
+use std::thread::JoinHandle;
+use std::thread::spawn;
 use std::time::Instant;
 use chess_engine::board::Board;
 use chess_engine::renderer::Renderer;
@@ -71,6 +74,8 @@ pub struct BotController {
 
     board: Board,
     renderer: Renderer,
+
+    bot_thread: Option<JoinHandle<Move>>,
 
     bot_color_white: bool,
 
@@ -132,6 +137,8 @@ impl BotController {
             board,
             renderer,
 
+            bot_thread: None,
+
             bot_color_white: true,
 
             bot: Bot::new()
@@ -156,9 +163,20 @@ impl BotController {
 
             let allow_moving = self.board.get_white_to_move() != self.bot_color_white;
 
-            if self.board.get_white_to_move() == self.bot_color_white && self.board.get_game_result() == GameResult::InProgress {
-                let m = self.bot.get_best_move(&mut self.board);
-                self.board.make_move(m, false);
+            if !allow_moving && self.board.get_game_result() == GameResult::InProgress && self.bot_thread.is_none() {
+                let mut bot_board = self.board.clone();
+                let mut bot_copy = self.bot.clone();
+                self.bot_thread = Some(spawn(move || -> Move {
+                    bot_copy.get_best_move(&mut bot_board)
+                }));
+            }
+
+            if self.bot_thread.is_some() {
+                if self.bot_thread.as_ref().unwrap().is_finished() {
+                    self.board.make_move(self.bot_thread.take().unwrap().join().expect("Joining bot thread failed"), false);
+
+                    self.bot_thread = None;
+                }
             }
 
             let mut draw_handle = self.raylib_handle.begin_drawing(&self.raylib_thread);
@@ -189,9 +207,20 @@ impl BotController {
                 }
             }
 
-            if self.board.get_game_result() == GameResult::InProgress {
-                let m = self.bot.get_best_move(&mut self.board);
-                self.board.make_move(m, false);
+            if self.board.get_game_result() == GameResult::InProgress && self.bot_thread.is_none() {
+                let mut bot_board = self.board.clone();
+                let mut bot_copy = self.bot.clone();
+                self.bot_thread = Some(spawn(move || -> Move {
+                    bot_copy.get_best_move(&mut bot_board)
+                }));
+            }
+
+            if self.bot_thread.is_some() {
+                if self.bot_thread.as_ref().unwrap().is_finished() {
+                    self.board.make_move(self.bot_thread.take().unwrap().join().expect("Joining bot thread failed"), false);
+
+                    self.bot_thread = None;
+                }
             }
 
             let mut draw_handle = self.raylib_handle.begin_drawing(&self.raylib_thread);
