@@ -2,7 +2,6 @@ use std::panic;
 use chess_engine::board::r#move::Move;
 use chess_engine::bot::ChessBot;
 use chess_engine::board::Board;
-use rand::random;
 
 #[derive(Clone, Copy)]
 pub struct Bot {
@@ -10,11 +9,15 @@ pub struct Bot {
     node_count: i64,
 }
 
+static RANDOMNESS: i64 = 10;
+static CASTLINGRIGHTSVALUE: i64 = 25;
+static CASTLINGINCENTIVE: i64 = 20;
+
 impl Bot {
     pub fn new() -> Bot {
         Bot {
             piece_values: [100, 300, 300, 500, 900, 100000],
-            node_count: 0
+            node_count: 0,
         }
     }
 }
@@ -25,20 +28,36 @@ impl ChessBot for Bot {
 
         let mut best_move: Move = moves[0];
         let mut best_value: i64 = -999999999;
-        let mut beta: i64 = 999999999;
 
         for m in moves {
             if !board.make_move(m, true) {
                 panic!("Make move failed!\nMove: {}\nPosition: {}", m.to_string(), board.generate_fen());
             }
 
-            let value = -self.search(board, 3);
+            let mut value = 0;
 
-            board.undo_move(true);
-
-            if value >= beta {
-                beta = value;
+            match board.get_game_result_simplified() {
+                0 => { }
+                1 => {
+                    board.undo_move(true);
+                    if board.get_white_to_move() { return m; }
+                    else { panic!("Invalid move played!\nFEN: {}\nPGN:\n{}", board.generate_fen(), board.get_pgn(None, None, None)); }
+                }
+                2 => {
+                    board.undo_move(true);
+                    if board.get_white_to_move() {
+                        panic!("Invalid move played!\nFEN: {}\nPGN:\n{}", board.generate_fen(), board.get_pgn(None, None, None));
+                    }
+                    else { return m; }
+                }
+                -1 => {
+                    value = -self.search(board, 3);
+                }
+                _ => { }
             }
+
+            board.undo_move(true).expect("Undo move failed");
+
             if value > best_value {
                 best_value = value;
                 best_move = m;
@@ -62,29 +81,35 @@ impl Bot {
         let mut best_value = -99999999;
 
         for m in moves {
-            if !board.make_move(m, true) {
-                match board.get_game_result_simplified() {
-                    0 => { return 0; }
-                    1 => {
-                        if board.get_white_to_move() { return 99999999; }
-                        else { return -99999999; }
-                    }
-                    2 => {
-                        if board.get_white_to_move() { return -99999999; }
-                        else { return 99999999; }
-                    }
-                    -1 => {
-                        panic!("Make move failed!\nMove: {}\nPosition: {}", m.to_string(), board.generate_fen());
-                    }
-                    _ => { }
+            board.make_move(m, true);
+
+            let mut value: i64 = 0;
+
+            match board.get_game_result_simplified() {
+                0 => { }
+                1 => {
+                    board.undo_move(true);
+                    if board.get_white_to_move() { return 99999999; }
+                    else { panic!("Invalid move played!\nFEN: {}\nPGN:\n{}", board.generate_fen(), board.get_pgn(None, None, None)); }
                 }
+                2 => {
+                    board.undo_move(true);
+                    if board.get_white_to_move() {
+                        panic!("Invalid move played!\nFEN: {}\nPGN:\n{}", board.generate_fen(), board.get_pgn(None, None, None));
+                    }
+                    else { return 99999999; }
+                }
+                -1 => {
+                    value = -self.search(board, depth - 1);
+                }
+                _ => { }
             }
 
-            let value: i64;
+            let log_move = board.undo_move(true).expect("Failed to undo move");
 
-            value = -self.search(board, depth - 1);
-
-            board.undo_move(true);
+            if log_move.castling {
+                value += CASTLINGRIGHTSVALUE * 2 + CASTLINGINCENTIVE;
+            }
 
             if value > best_value {
                 best_value = value;
@@ -123,7 +148,14 @@ impl Bot {
             value *= -1;
         }
 
-        value + random::<i64>() % 10
+        if board.get_white_to_move() {
+            value += board.get_castling_rights()[0] as i64 * CASTLINGRIGHTSVALUE + board.get_castling_rights()[1] as i64 * CASTLINGRIGHTSVALUE;
+        }
+        else {
+            value += board.get_castling_rights()[2] as i64 * CASTLINGRIGHTSVALUE + board.get_castling_rights()[3] as i64 * CASTLINGRIGHTSVALUE;
+        }
+
+        value + rand::random::<i64>() % RANDOMNESS
     }
 
     #[allow(unused)]
