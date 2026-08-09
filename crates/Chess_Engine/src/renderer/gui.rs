@@ -40,6 +40,7 @@ impl Renderer {
 
         if rl.is_key_pressed(KEY_T) {
             board.test_fen_string_handling();
+            board.test_duplicate_moves();
         }
 
         self.handle_gui_buttons(board, rl);

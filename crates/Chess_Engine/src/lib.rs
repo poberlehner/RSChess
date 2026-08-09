@@ -77,7 +77,7 @@ mod tests {
                 // println!("Aux: {}: {}", legal_move.to_string(), num_new_positions);
             }
 
-            // undo_move_log.push((board.undo_move().unwrap(), max_depth - depth));
+            // undo_move_log.push((board.undo_move(true).unwrap(), max_depth - depth));
             board.undo_move(true);
 
             // board.invalidate_caches();

@@ -1,6 +1,7 @@
 use crate::board::gamestate::GameResult;
 use crate::board::r#move::Move;
 use crate::board::Board;
+use crate::board::piece::PieceType;
 use crate::board::utilities::TimeControl;
 use crate::renderer::Renderer;
 use raylib::prelude::*;
@@ -89,8 +90,10 @@ impl Renderer {
                 let moves = board.get_legal_moves_for_square(self.selected_square.unwrap());
 
                 for m in moves {
-                    draw_handle.draw_circle((self.square_index_to_pos(&draw_handle, m.destination_square as i32).x + (self.square_size / 2) as f32) as i32,
-                        (self.square_index_to_pos(&draw_handle, m.destination_square as i32).y + (self.square_size / 2) as f32) as i32, self.square_size as f32 / 8.0, color);
+                    if m.promotion_type == PieceType::None || m.promotion_type == PieceType::Pawn {
+                        draw_handle.draw_circle((self.square_index_to_pos(&draw_handle, m.destination_square as i32).x + (self.square_size / 2) as f32) as i32,
+                            (self.square_index_to_pos(&draw_handle, m.destination_square as i32).y + (self.square_size / 2) as f32) as i32, self.square_size as f32 / 8.0, color);
+                    }
                 }
             }
             else {
