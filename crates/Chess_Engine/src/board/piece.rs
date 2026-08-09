@@ -23,4 +23,28 @@ impl Piece {
 
         self.piece_type as usize + 7 * self.white_piece as usize
     }
+
+    pub fn to_char(&self) -> char {
+        return match self.piece_type {
+            PieceType::King => { if self.white_piece { 'K' } else { 'k' } }
+            PieceType::Queen => { if self.white_piece { 'Q' } else { 'q' } }
+            PieceType::Rook => { if self.white_piece { 'R' } else { 'r' } }
+            PieceType::Knight => { if self.white_piece { 'N' } else { 'n' } }
+            PieceType::Bishop => { if self.white_piece { 'B' } else { 'b' } }
+            PieceType::Pawn => { if self.white_piece { 'P' } else { 'p' } }
+            PieceType::None => { '0' }
+        }
+    }
+
+    pub fn to_char_uppercase(&self) -> char {
+        return match self.piece_type {
+            PieceType::King => { 'K' }
+            PieceType::Queen => { 'Q' }
+            PieceType::Rook => { 'R' }
+            PieceType::Knight => { 'N' }
+            PieceType::Bishop => { 'B' }
+            PieceType::Pawn => { 'P' }
+            PieceType::None => { '0' }
+        }
+    }
 }

@@ -48,6 +48,11 @@ impl Board {
         }
     }
 
+    #[inline(always)]
+    pub fn file_char_to_index(file: char) -> Option<usize> {
+        Self::column_char_to_index(file)
+    }
+
     //The return value is lowercase
     #[inline(always)]
     pub fn column_index_to_char(column: i32) -> Option<char> {
@@ -62,6 +67,11 @@ impl Board {
             7 => { Some('h') }
             _ => { None }
         }
+    }
+
+    #[inline(always)]
+    pub fn file_index_to_char(file: i32) -> Option<char> {
+        Self::column_index_to_char(file)
     }
 
     #[inline(always)]

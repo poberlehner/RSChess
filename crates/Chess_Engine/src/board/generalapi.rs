@@ -4,7 +4,7 @@ use raylib::trace_log;
 use crate::board::gamestate::GameResult;
 use crate::board::piece::{Piece, PieceType};
 use crate::board::r#move::{LogMove, Move};
-use crate::board::Board;
+use crate::board::{Board, STARTFEN};
 use crate::board::utilities::TimeControl;
 use std::cmp::max;
 use std::time::*;
@@ -13,11 +13,12 @@ use std::time::*;
 impl Board {
     ///returns: success
     pub fn make_move(&mut self, m: Move, in_search: bool) -> bool {
-        if self.game_result != GameResult::InProgress {
-            if !in_search {
-                println!("The game is not running");
-                println!("Game Result: {:?}", self.game_result);
-            }
+        if self.game_result != GameResult::InProgress || ((in_search) &&
+            (self.game_result == GameResult::Repetition || self.game_result == GameResult::FiftyMoveRule)) {
+            println!("The game is not running");
+            println!("Game Result: {:?}", self.game_result);
+
+            self.move_log.push(LogMove::null_move());
 
             return false;
         }
@@ -29,11 +30,17 @@ impl Board {
         if !self.legal_moves.as_ref().unwrap().contains(&m) {
             println!("Position: {}", self.generate_fen());
             println!("The Move: {} is not legal", m.to_string());
+
+            self.move_log.push(LogMove::null_move());
+
             return false;
         }
 
         if !self.handle_time() {
             println!("No time left");
+
+            self.move_log.push(LogMove::null_move());
+
             return false;
         }
 
@@ -48,7 +55,8 @@ impl Board {
             en_passant_square_before: self.game_state.en_passant_square,
             castling_rights_before: self.game_state.castling_rights,
             fifty_move_counter_before: self.game_state.fifty_move_counter,
-            moved_piece: self.squares[m.origin_square as usize].unwrap()
+            moved_piece: self.squares[m.origin_square as usize].unwrap(),
+            null_move: false
         };
 
         if self.time_control != TimeControl::Unlimited {
@@ -128,15 +136,15 @@ impl Board {
             }
         }
 
-        self.game_state.white_to_move = !self.game_state.white_to_move;
-
         self.invalidate_caches();
-
-        self.generate_all_bitboards();
 
         self.move_log.push(current_logmove);
 
-       self.handle_end_conditions(in_search, &current_logmove);
+        self.game_state.white_to_move = !self.game_state.white_to_move;
+
+        self.handle_end_conditions(in_search, &current_logmove);
+
+        self.generate_all_bitboards();
 
         true
     }
@@ -153,6 +161,11 @@ impl Board {
         self.game_state.white_to_move = !self.game_state.white_to_move;
 
         let last = self.move_log.pop().unwrap();
+
+        if last.null_move {
+            return Some(last);
+        }
+
         let piece = self.squares[last.destination_square as usize].expect("Invalid logged move");
 
         if self.game_result != GameResult::BlackIsMated && self.game_result != GameResult::WhiteIsMated {
@@ -306,27 +319,42 @@ impl Board {
             GameResult::NotStarted           => {-1 }
             GameResult::InsufficientMaterial => { 0 }
             GameResult::FiftyMoveRule        => { 0 }
-            _ => {
-                0
-            }
+            GameResult::Repetition           => { 0 }
+            GameResult::Stalemate            => { 0 }
         }
     }
 
     pub fn get_move_history(&self) -> String {
         let mut result = "".to_string();
+        let mut number: i32 = 1;
+
+        let mut board = Board::new(None);
+        board.load_fen(STARTFEN);
+        board.start_game(TimeControl::Unlimited);
 
         for m in self.move_log.iter() {
-            if !m.castling {
-                result.push_str(&m.to_move().to_string());
+            if number % 2 == 1 {
+                result.push_str(&format!("{}. ", (number as f32 / 2.0).ceil()));
+            }
+
+            let move_str = board.log_move_to_string(m.clone());
+
+            board.make_move(m.to_move(), false);
+
+            if board.checkmate() {
+                result.push(m.moved_piece.to_char_uppercase());
+                result.push_str(&move_str);
+                result.push('#');
+            }
+            else if board.check() {
+                result.push_str(&move_str);
+                result.push('+');
             }
             else {
-                if m.destination_square % 8 == 2 {
-                    result.push_str("0-0-0");
-                }
-                else {
-                    result.push_str("0-0");
-                }
+                result.push_str(&move_str);
             }
+
+            number += 1;
 
             result.push(' ');
         }
@@ -351,7 +379,7 @@ impl Board {
         result.push_str(&format!("{}", event.unwrap_or("-")));
         result.push_str("\"]\n");
 
-        result.push_str("[Site \"Chess\"]\n");
+        result.push_str("[Site \"RSChess\"]\n");
 
         result.push_str(&format!("[Date \"{}.{}.{}\"]\n",
             self.game_start_time.year(), self.game_start_time.month(), self.game_start_time.day()));
@@ -379,10 +407,12 @@ impl Board {
                 0  => { "1/2-1/2" }
                 1  => { "1-0" }
                 2  => { "0-1" }
-                _  => { "" }
+                _  => { "game_result_simplified corrupted" }
             });
             result.push_str("\"]\n");
         }
+
+        result.push('\n');
 
         result.push_str(&self.get_move_history());
 
@@ -393,8 +423,6 @@ impl Board {
         self.legal_moves = None;
         self.white_double_check = None;
         self.black_double_check = None;
-        self.white_pieces_bitboard = None;
-        self.black_pieces_bitboard = None;
         self.white_check_block_bitboard = None;
         self.black_check_block_bitboard = None;
         self.white_diagonal_pin_bitboard = None;
@@ -541,10 +569,91 @@ impl Board {
             }
         }
 
-
         self.game_state.en_passant_square = None;
 
         false
+    }
+
+    ///Assumes the move hasn't been made yet
+    fn log_move_to_string(&mut self, m: LogMove) -> String {
+        if m.castling {
+            if m.destination_square % 8 == 2 {
+                return String::from("0-0-0");
+            }
+            else {
+                return String::from("0-0");
+            }
+        }
+
+        let mut str: String = String::new();
+
+        self.test_duplicate_moves();
+
+        let moves = self.get_legal_moves().as_ref().expect("Failed to get legal moves");
+
+        let mut file_eq_count = 0;
+        let mut rank_eq_count = 0;
+        let mut pawn_eq_count = 0;
+
+        for m_local in moves.clone().iter() {
+            let moved_piece = self.squares[m_local.origin_square as usize].clone().unwrap();
+            if m_local.destination_square == m.destination_square {
+
+                if moved_piece == m.moved_piece {
+                    if m_local.origin_square % 8 == m.origin_square % 8 {
+                        file_eq_count += 1;
+                    }
+                    if m_local.origin_square / 8 == m.origin_square / 8 {
+                        rank_eq_count += 1;
+                    }
+                }
+
+                if m.moved_piece.piece_type == PieceType::Pawn && self.squares[m_local.origin_square as usize].unwrap().piece_type == PieceType::Pawn {
+                    pawn_eq_count += 1;
+                }
+            }
+        }
+
+        if m.moved_piece.piece_type != PieceType::Pawn {
+            str.push(m.moved_piece.to_char_uppercase());
+
+            if rank_eq_count >= 2 {
+                str.push(Self::file_index_to_char(m.origin_square as i32 % 8).unwrap());
+            }
+
+            if file_eq_count >= 2 {
+                str.push(char::from_digit(m.origin_square as u32 / 8 + 1, 10).unwrap());
+            }
+            // if eq_target_count >= 2 || (m.captured_piece.is_some() && m.captured_piece.unwrap().piece_type != PieceType::None) {
+            //     str.push(m.moved_piece.to_char_uppercase());
+            // }
+
+            // if file_eq_count >= 2 {
+            //     str.push(Self::file_index_to_char(m.origin_square as i32 % 8).unwrap());
+            // }
+
+            // if rank_eq_count >= 2 {
+            //     str.push(char::from_digit(m.origin_square as u32 / 8 + 1, 10).unwrap());
+            // }
+        }
+        else {
+            if pawn_eq_count >= 2 || (m.captured_piece.is_some() && m.captured_piece.unwrap().piece_type != PieceType::None) {
+                str.push(Self::file_index_to_char(m.origin_square as i32 % 8).unwrap());
+            }
+        }
+
+        if m.captured_piece.is_some() && m.captured_piece.unwrap().piece_type != PieceType::None  {
+            str.push('x')
+        }
+
+        str.push_str(&format!("{}{}", Self::file_index_to_char(m.destination_square as i32 % 8).unwrap(), m.destination_square / 8 + 1));
+
+        if m.promotion_type != PieceType::None {
+            str.push('=');
+            str.push(Self::piece_to_char(Piece { piece_type: m.promotion_type, white_piece: true }).unwrap());
+        }
+
+        str
     }
 }
 
@@ -603,23 +712,27 @@ impl Board {
             }
         }
 
-        if !in_search {
-            if self.game_state.fifty_move_counter == 100 {
-                self.game_result = GameResult::FiftyMoveRule;
+        if self.game_state.fifty_move_counter == 100 {
+            self.game_result = GameResult::FiftyMoveRule;
+            if !in_search {
                 println!("{blue}Draw by the fifty-move rule{reset}");
                 trace_log(LOG_INFO, "Draw by the fifty-move rule");
             }
+        }
 
-            //Handle insufficient material
-            if self.has_insufficient_material(true) && self.has_insufficient_material(false) {
-                self.game_result = GameResult::InsufficientMaterial;
+        //Handle insufficient material
+        if self.has_insufficient_material(true) && self.has_insufficient_material(false) {
+            self.game_result = GameResult::InsufficientMaterial;
+            if !in_search {
                 println!("{blue}Draw due to insufficient material{reset}");
                 trace_log(LOG_INFO, "Draw due to insufficient material");
             }
+        }
 
-            //Handle Stalemate
-            if self.get_legal_moves().as_ref().unwrap().is_empty() {
-                self.game_result = GameResult::Stalemate;
+        //Handle Stalemate
+        if self.get_legal_moves().as_ref().unwrap().is_empty() {
+            self.game_result = GameResult::Stalemate;
+            if !in_search {
                 println!("{blue}Draw due to stalemate{reset}");
                 trace_log(LOG_INFO, "Draw due to stalemate");
             }

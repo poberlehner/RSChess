@@ -59,7 +59,8 @@ pub struct Board {
     black_diagonal_pin_bitboard: Option<i64>,
     white_check_block_bitboard: Option<i64>,
     black_check_block_bitboard: Option<i64>,
-
     white_en_passant_pin_bitboard: Option<i64>,
     black_en_passant_pin_bitboard: Option<i64>,
 }
+
+const STARTFEN: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";

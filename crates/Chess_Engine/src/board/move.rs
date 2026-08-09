@@ -1,3 +1,4 @@
+use std::time::Duration;
 use crate::board::Board;
 use crate::board::piece::{Piece, PieceType};
 
@@ -39,10 +40,13 @@ pub struct LogMove {
     pub castling: bool,
     pub castling_rights_before: [bool; 4],
     pub fifty_move_counter_before: u32,
+
+    pub null_move: bool
 }
 
 impl Move {
-    ///Unaware of castling as that is handled by the make_move function
+    ///Returns the move name in UCI format
+    /// Example: "e7e8q"
     pub fn to_string(&self) -> String {
         let mut string: String = String::from("");
 
@@ -68,6 +72,23 @@ impl LogMove {
             origin_square: self.origin_square,
             destination_square: self.destination_square,
             promotion_type: self.promotion_type
+        }
+    }
+    
+    pub fn null_move() -> Self {
+        LogMove {
+            null_move: true,
+            origin_square: 0,
+            destination_square: 0,
+            promotion_type: PieceType::None,
+            captured_piece: None,
+            castling: false,
+            castling_rights_before: [false, false, false, false],
+            en_passant: false,
+            en_passant_square_before: None,
+            fifty_move_counter_before: 1,
+            moved_piece: Piece { piece_type: PieceType::None, white_piece: true },
+            time_taken: Duration::from_hours(0)
         }
     }
 }

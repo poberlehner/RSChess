@@ -39,7 +39,7 @@ impl Board {
             println!("{} Test failed", failure_count);
         }
         else {
-            println!("All tests succeeded");
+            println!("All fen tests succeeded");
         }
     }
 }
