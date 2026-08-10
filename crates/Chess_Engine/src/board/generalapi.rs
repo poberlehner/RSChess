@@ -342,7 +342,6 @@ impl Board {
             board.make_move(m.to_move(), false);
 
             if board.checkmate() {
-                result.push(m.moved_piece.to_char_uppercase());
                 result.push_str(&move_str);
                 result.push('#');
             }
@@ -423,6 +422,8 @@ impl Board {
         self.legal_moves = None;
         self.white_double_check = None;
         self.black_double_check = None;
+        self.white_pieces_bitboard = None;
+        self.black_pieces_bitboard = None;
         self.white_check_block_bitboard = None;
         self.black_check_block_bitboard = None;
         self.white_diagonal_pin_bitboard = None;
@@ -578,10 +579,10 @@ impl Board {
     fn log_move_to_string(&mut self, m: LogMove) -> String {
         if m.castling {
             if m.destination_square % 8 == 2 {
-                return String::from("0-0-0");
+                return String::from("O-O-O");
             }
             else {
-                return String::from("0-0");
+                return String::from("O-O");
             }
         }
 
@@ -594,12 +595,15 @@ impl Board {
         let mut file_eq_count = 0;
         let mut rank_eq_count = 0;
         let mut pawn_eq_count = 0;
+        let mut eq_count = 0;
 
         for m_local in moves.clone().iter() {
             let moved_piece = self.squares[m_local.origin_square as usize].clone().unwrap();
             if m_local.destination_square == m.destination_square {
 
                 if moved_piece == m.moved_piece {
+                    eq_count += 1;
+
                     if m_local.origin_square % 8 == m.origin_square % 8 {
                         file_eq_count += 1;
                     }
@@ -617,27 +621,16 @@ impl Board {
         if m.moved_piece.piece_type != PieceType::Pawn {
             str.push(m.moved_piece.to_char_uppercase());
 
-            if rank_eq_count >= 2 {
+            if rank_eq_count >= 2 || (file_eq_count < 2 && eq_count >= 2) {
                 str.push(Self::file_index_to_char(m.origin_square as i32 % 8).unwrap());
             }
 
             if file_eq_count >= 2 {
                 str.push(char::from_digit(m.origin_square as u32 / 8 + 1, 10).unwrap());
             }
-            // if eq_target_count >= 2 || (m.captured_piece.is_some() && m.captured_piece.unwrap().piece_type != PieceType::None) {
-            //     str.push(m.moved_piece.to_char_uppercase());
-            // }
-
-            // if file_eq_count >= 2 {
-            //     str.push(Self::file_index_to_char(m.origin_square as i32 % 8).unwrap());
-            // }
-
-            // if rank_eq_count >= 2 {
-            //     str.push(char::from_digit(m.origin_square as u32 / 8 + 1, 10).unwrap());
-            // }
         }
         else {
-            if pawn_eq_count >= 2 || (m.captured_piece.is_some() && m.captured_piece.unwrap().piece_type != PieceType::None) {
+            if pawn_eq_count >= 2 || (m.captured_piece.is_some() && m.captured_piece.unwrap().piece_type != PieceType::None) || m.en_passant {
                 str.push(Self::file_index_to_char(m.origin_square as i32 % 8).unwrap());
             }
         }

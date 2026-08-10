@@ -39,6 +39,11 @@ impl Board {
         self.generate_pieces_bitboard(false) | self.generate_pieces_bitboard(true)
     }
 
+    #[inline(always)]
+    pub fn get_color_to_move_pieces_bitboard(&mut self) -> i64 {
+        self.generate_pieces_bitboard(self.game_state.white_to_move)
+    }
+
     //Includes the movement of pinned pieces
     #[inline(always)]
     pub fn get_attacked_squares_bitboard(&mut self, white: bool) -> i64 {
