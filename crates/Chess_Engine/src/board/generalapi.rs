@@ -1,5 +1,5 @@
 use chrono::{Datelike, Local, Timelike};
-use raylib::ffi::TraceLogLevel::LOG_INFO;
+use raylib::ffi::TraceLogLevel::{self, LOG_INFO};
 use raylib::trace_log;
 use crate::board::gamestate::GameResult;
 use crate::board::piece::{Piece, PieceType};
@@ -8,6 +8,7 @@ use crate::board::{Board, STARTFEN};
 use crate::board::utilities::TimeControl;
 use std::cmp::max;
 use std::time::*;
+use std::io::prelude::*;
 
 //Main api functions
 impl Board {
@@ -416,6 +417,25 @@ impl Board {
         result.push_str(&self.get_move_history());
 
         result
+    }
+
+    pub fn save_game(&mut self, save_file: String, event: Option<&str>, competitors: Option<(&str, &str)>, round: Option<&str>) {
+        let pgn_file = std::fs::File::options().append(true).create(true).write(true).open(&save_file);
+
+        if pgn_file.is_err() {
+        trace_log(TraceLogLevel::LOG_WARNING, &format!("Failed to load file \"{}\"", &save_file));
+            return;
+        }
+
+        let mut pgn_file = pgn_file.unwrap();
+        let pgn = self.get_pgn(event, competitors, round);
+
+        if let Err(err) = pgn_file.write(pgn.as_bytes()) {
+            trace_log(TraceLogLevel::LOG_ERROR, &format!("{}", err.to_string()));
+            return;
+        }
+
+        pgn_file.write("\n\n".as_bytes()).expect("Second write to assets/Games.pgn failed");
     }
 
     pub fn invalidate_caches(&mut self) {

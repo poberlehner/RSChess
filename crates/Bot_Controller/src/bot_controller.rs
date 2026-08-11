@@ -1,3 +1,4 @@
+use chess_engine::board::STARTFEN;
 use chess_engine::board::gamestate::GameResult;
 use chess_engine::board::r#move::Move;
 use chess_engine::board::utilities::TimeControl;
@@ -200,6 +201,12 @@ impl BotController {
 
                     self.board.make_move(m.unwrap(), false);
 
+                    if self.board.get_game_result_simplified() != -1 {
+                        let competitors = if self.bot_color_white { ("Human", "RSChess Bot") } else { ("RSChess Bot", "Human") };
+                        self.board.save_game(String::from("assets/Games.pgn"), 
+                            Some("RSChess Human vs. Bot"), Some(competitors), None);
+                    }
+
                     self.bot_thread = None;
                 }
             }
@@ -226,6 +233,13 @@ impl BotController {
                     //Constantly locking self.rng is not ideal because it will lead to lagging if it is used outside while this thread is running
                     bot_copy.get_best_move(&mut bot_board, &mut rng_copy.lock().unwrap())
                 }));
+            }
+
+            if self.board.get_game_result_simplified() != -1 {
+                self.board.save_game(String::from("assets/Games.pgn"), 
+                    Some("RSChess Bot vs. Bot"), Some(("RSChess Bot", "RSChess Bot")), None);
+                self.board.load_fen(STARTFEN);
+                self.board.start_game(TimeControl::Unlimited);
             }
 
             if self.bot_thread.is_some() {
