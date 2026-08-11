@@ -114,20 +114,7 @@ impl BotController {
 
         panic::set_hook(Box::new(custom_panic_hook));
 
-        //Handling the working directory
-        let current_directory = env::current_dir();
-        if current_directory.is_err() {
-            trace_log(TraceLogLevel::LOG_FATAL, "Failed to get current working directory");
-        }
-        let mut current_directory = current_directory.unwrap();
-
-        while !(exists(current_directory.join(PathBuf::from("assets"))).is_ok() && exists(current_directory.join(PathBuf::from("assets"))).unwrap()) {
-            trace_log(TraceLogLevel::LOG_ERROR, format!("Current directory: {:?}", current_directory).as_str());
-
-             current_directory.pop();
-        }
-
-        env::set_current_dir(current_directory).expect("Failed to set current working directory");
+        Self::initialize_working_directory();
 
         rl.set_target_fps(120);
         trace_log(TraceLogLevel::LOG_INFO, format!("Controller init: Window init time: {:?}", start_time.elapsed()).as_str());
@@ -144,7 +131,7 @@ impl BotController {
             raylib_handle: rl,
             raylib_thread: thread,
 
-            bot_rng: Arc::new(Mutex::new(StdRng::seed_from_u64(11))),
+            bot_rng: Arc::new(Mutex::new(StdRng::seed_from_u64(15))),
 
             board,
             renderer,
@@ -155,6 +142,23 @@ impl BotController {
 
             bot: Bot::new()
         }
+    }
+
+    fn initialize_working_directory() {
+        //Handling the working directory
+        let current_directory = env::current_dir();
+        if current_directory.is_err() {
+            trace_log(TraceLogLevel::LOG_FATAL, "Failed to get current working directory");
+        }
+        let mut current_directory = current_directory.unwrap();
+
+        while !(exists(current_directory.join(PathBuf::from("assets"))).is_ok() && exists(current_directory.join(PathBuf::from("assets"))).unwrap()) {
+            trace_log(TraceLogLevel::LOG_ERROR, format!("Current directory: {:?}", current_directory).as_str());
+
+             current_directory.pop();
+        }
+
+        env::set_current_dir(current_directory).expect("Failed to set current working directory");
     }
 
     fn initialize_chess(&mut self) {
@@ -200,21 +204,7 @@ impl BotController {
                 }
             }
 
-            let mut draw_handle = self.raylib_handle.begin_drawing(&self.raylib_thread);
-            draw_handle.clear_background(Color::BLACK);
-
-            self.renderer.draw_board(&mut draw_handle);
-
-            self.renderer.draw_pieces(&mut self.board, &mut draw_handle);
-            self.renderer.draw_moves(&mut self.board, Color { r: 128, g: 128, b: 128, a: 155}, None, &mut draw_handle);
-
-            self.board.get_legal_moves();
-
-            self.renderer.draw_keyboard_shortcut_tips(&mut self.board, &mut draw_handle);
-
-            self.renderer.update_gui(&mut self.board, &mut draw_handle, allow_moving);
-
-            draw_handle.draw_fps(20, 20);
+            self.draw(allow_moving);
         }
 
         self.renderer.unload_textures();
@@ -252,21 +242,7 @@ impl BotController {
                 }
             }
 
-            let mut draw_handle = self.raylib_handle.begin_drawing(&self.raylib_thread);
-            draw_handle.clear_background(Color::BLACK);
-
-            self.renderer.draw_board(&mut draw_handle);
-
-            self.renderer.draw_pieces(&mut self.board, &mut draw_handle);
-            self.renderer.draw_moves(&mut self.board, Color { r: 128, g: 128, b: 128, a: 155}, None, &mut draw_handle);
-
-            self.board.get_legal_moves();
-
-            self.renderer.draw_keyboard_shortcut_tips(&mut self.board, &mut draw_handle);
-
-            self.renderer.update_gui(&mut self.board, &mut draw_handle, false);
-
-            draw_handle.draw_fps(20, 20);
+            self.draw(false);
         }
 
         self.renderer.unload_textures();
@@ -280,23 +256,25 @@ impl BotController {
                 }
             }
 
-            let mut draw_handle = self.raylib_handle.begin_drawing(&self.raylib_thread);
-            draw_handle.clear_background(Color::BLACK);
-
-            self.renderer.draw_board(&mut draw_handle);
-
-            self.renderer.draw_pieces(&mut self.board, &mut draw_handle);
-            self.renderer.draw_moves(&mut self.board, Color { r: 128, g: 128, b: 128, a: 155}, None, &mut draw_handle);
-
-            self.board.get_legal_moves();
-
-            self.renderer.draw_keyboard_shortcut_tips(&mut self.board, &mut draw_handle);
-
-            self.renderer.update_gui(&mut self.board, &mut draw_handle, true);
-
-            draw_handle.draw_fps(20, 20);
+            self.draw(true);
         }
 
         self.renderer.unload_textures();
+    }
+
+    fn draw(&mut self, allow_moving: bool) {
+        let mut draw_handle = self.raylib_handle.begin_drawing(&self.raylib_thread);
+        draw_handle.clear_background(Color::BLACK);
+
+        self.renderer.draw_board(&mut draw_handle);
+
+        self.renderer.draw_pieces(&mut self.board, &mut draw_handle);
+        self.renderer.draw_moves(&mut self.board, Color { r: 128, g: 128, b: 128, a: 155}, None, &mut draw_handle);
+
+        self.renderer.draw_keyboard_shortcut_tips(&mut self.board, &mut draw_handle);
+
+        self.renderer.update_gui(&mut self.board, &mut draw_handle, allow_moving);
+
+        draw_handle.draw_fps(20, 20);
     }
 }
