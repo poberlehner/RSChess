@@ -2,6 +2,8 @@ use chess_engine::board::gamestate::GameResult;
 use chess_engine::board::r#move::Move;
 use chess_engine::board::utilities::TimeControl;
 use chrono::prelude::*;
+use rand::SeedableRng;
+use rand::rngs::StdRng;
 use raylib::core::RaylibHandle;
 use raylib::ffi::GetRandomValue;
 use raylib::ffi::GuiControl::DEFAULT;
@@ -15,6 +17,7 @@ use std::panic::PanicHookInfo;
 use std::path::PathBuf;
 use std::thread::JoinHandle;
 use std::thread::spawn;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use chess_engine::board::Board;
 use chess_engine::renderer::Renderer;
@@ -64,13 +67,18 @@ fn custom_panic_hook(panic_info: &PanicHookInfo) {
          let time = Local::now();
          let time_str = time.to_string();
 
-         log_file.write(["[".as_bytes(), time_str.as_bytes(), "] : ".as_bytes(), panic_info.payload_as_str().expect("Failed to get panic info as string").as_bytes(), "\n".as_bytes()].concat().as_ref()).expect("Failed to write to log file");
+         log_file.write(["[".as_bytes(), time_str.as_bytes(), "] : ".as_bytes(),
+             panic_info.payload_as_str().expect("Failed to get panic info as string").as_bytes(), "\n".as_bytes()]
+             .concat().as_ref()).expect("Failed to write to log file");
      }
 }
 
 pub struct BotController {
     raylib_handle: RaylibHandle,
     raylib_thread: RaylibThread,
+
+    ///Only for the bot as the bot_thread keeps it locked for it's entire runtime
+    bot_rng: Arc<Mutex<StdRng>>,
 
     board: Board,
     renderer: Renderer,
@@ -128,11 +136,15 @@ impl BotController {
         let board = Board::new(Some(&mut rl));
         trace_log(TraceLogLevel::LOG_INFO, format!("Controller init: Board init time: {:?}", start_time.elapsed()).as_str());
 
-        let renderer = Renderer::new(&mut rl, &thread, "assets/Pieces.png".parse().unwrap(), 130,Color { r: 171, g: 121, b: 101, a: 255 } ,Color { r: 238, g: 216, b: 192, a: 255});
+        let renderer = Renderer::new(&mut rl, &thread, "assets/Pieces.png".parse().unwrap(),
+            130,Color { r: 171, g: 121, b: 101, a: 255 },
+            Color { r: 238, g: 216, b: 192, a: 255});
 
         BotController {
             raylib_handle: rl,
             raylib_thread: thread,
+
+            bot_rng: Arc::new(Mutex::new(StdRng::seed_from_u64(11))),
 
             board,
             renderer,
@@ -161,19 +173,28 @@ impl BotController {
                 }
             }
 
+            //Wether to allow the player to move pieces
             let allow_moving = self.board.get_white_to_move() != self.bot_color_white;
 
             if !allow_moving && self.board.get_game_result() == GameResult::InProgress && self.bot_thread.is_none() {
                 let mut bot_board = self.board.clone();
                 let mut bot_copy = self.bot.clone();
+                let rng_copy = self.bot_rng.clone();
                 self.bot_thread = Some(spawn(move || -> Move {
-                    bot_copy.get_best_move(&mut bot_board)
+                    //Constantly locking self.rng is not ideal because it will lead to lagging if it is used outside while this thread is running
+                    bot_copy.get_best_move(&mut bot_board, &mut rng_copy.lock().unwrap())
                 }));
             }
 
             if self.bot_thread.is_some() {
                 if self.bot_thread.as_ref().unwrap().is_finished() {
-                    self.board.make_move(self.bot_thread.take().unwrap().join().expect("Joining bot thread failed"), false);
+                    let m = self.bot_thread.take().unwrap().join();
+
+                    if m.is_err() {
+                        panic::resume_unwind(m.unwrap_err());
+                    }
+
+                    self.board.make_move(m.unwrap(), false);
 
                     self.bot_thread = None;
                 }
@@ -210,14 +231,22 @@ impl BotController {
             if self.board.get_game_result() == GameResult::InProgress && self.bot_thread.is_none() {
                 let mut bot_board = self.board.clone();
                 let mut bot_copy = self.bot.clone();
+                let rng_copy = self.bot_rng.clone();
                 self.bot_thread = Some(spawn(move || -> Move {
-                    bot_copy.get_best_move(&mut bot_board)
+                    //Constantly locking self.rng is not ideal because it will lead to lagging if it is used outside while this thread is running
+                    bot_copy.get_best_move(&mut bot_board, &mut rng_copy.lock().unwrap())
                 }));
             }
 
             if self.bot_thread.is_some() {
                 if self.bot_thread.as_ref().unwrap().is_finished() {
-                    self.board.make_move(self.bot_thread.take().unwrap().join().expect("Joining bot thread failed"), false);
+                    let m = self.bot_thread.take().unwrap().join();
+
+                    if m.is_err() {
+                        panic::resume_unwind(m.unwrap_err());
+                    }
+
+                    self.board.make_move(m.unwrap(), false);
 
                     self.bot_thread = None;
                 }

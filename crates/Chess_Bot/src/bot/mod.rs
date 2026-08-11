@@ -2,6 +2,7 @@ use std::panic;
 use chess_engine::board::r#move::Move;
 use chess_engine::bot::ChessBot;
 use chess_engine::board::Board;
+use rand::{RngExt, rngs::StdRng};
 
 #[derive(Clone, Copy)]
 pub struct Bot {
@@ -10,8 +11,6 @@ pub struct Bot {
 }
 
 static RANDOMNESS: i64 = 10;
-static CASTLINGRIGHTSVALUE: i64 = 25;
-static CASTLINGINCENTIVE: i64 = 20;
 
 impl Bot {
     pub fn new() -> Bot {
@@ -23,7 +22,7 @@ impl Bot {
 }
 
 impl ChessBot for Bot {
-    fn get_best_move(&mut self, board: &mut Board) -> Move {
+    fn get_best_move(&mut self, board: &mut Board, rng: &mut StdRng) -> Move {
         let moves = board.get_legal_moves().clone().unwrap();
 
         let mut best_move: Move = moves[0];
@@ -51,7 +50,7 @@ impl ChessBot for Bot {
                     else { return m; }
                 }
                 -1 => {
-                    value = -self.search(board, 3);
+                    value = -self.search(board, 3, rng);
                 }
                 _ => { }
             }
@@ -72,9 +71,9 @@ impl ChessBot for Bot {
 }
 
 impl Bot {
-    fn search(&mut self, board: &mut Board, depth: i32) -> i64 {
+    fn search(&mut self, board: &mut Board, depth: i32, rng: &mut StdRng) -> i64 {
         if depth == 0 {
-            return self.evaluate(board);
+            return self.evaluate(board, rng);
         }
 
         let moves = board.get_legal_moves().clone().unwrap();
@@ -100,16 +99,12 @@ impl Bot {
                     else { return 99999999; }
                 }
                 -1 => {
-                    value = -self.search(board, depth - 1);
+                    value = -self.search(board, depth - 1, rng);
                 }
                 _ => { }
             }
 
-            let log_move = board.undo_move(true).expect("Failed to undo move");
-
-            if log_move.castling {
-                value += CASTLINGRIGHTSVALUE * 2 + CASTLINGINCENTIVE;
-            }
+            board.undo_move(true).expect("Failed to undo move");
 
             if value > best_value {
                 best_value = value;
@@ -120,7 +115,7 @@ impl Bot {
     }
 
     //Returns the eval from the perspective of the side to move
-    pub fn evaluate(&mut self, board: &mut Board) -> i64 {
+    pub fn evaluate(&mut self, board: &mut Board, rng: &mut StdRng) -> i64 {
         let squares = board.get_squares();
         let mut white_value: i64 = 0;
         let mut black_value: i64 = 0;
@@ -148,27 +143,6 @@ impl Bot {
             value *= -1;
         }
 
-        if board.get_white_to_move() {
-            value += board.get_castling_rights()[0] as i64 * CASTLINGRIGHTSVALUE + board.get_castling_rights()[1] as i64 * CASTLINGRIGHTSVALUE;
-        }
-        else {
-            value += board.get_castling_rights()[2] as i64 * CASTLINGRIGHTSVALUE + board.get_castling_rights()[3] as i64 * CASTLINGRIGHTSVALUE;
-        }
-
-        value + rand::random::<i64>() % RANDOMNESS
-    }
-
-    #[allow(unused)]
-    fn get_piece_num(&mut self, board: &Board) -> i32 {
-        let squares = board.get_squares();
-        let mut result = 0;
-
-        for i in 0..64 {
-            if squares[i].is_some() {
-                result += 1;
-            }
-        }
-
-        result
+        value + rng.random_range(0..RANDOMNESS)
     }
 }
