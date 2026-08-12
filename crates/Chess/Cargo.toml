@@ -8,9 +8,4 @@ raylib = "6.0.0"
 chess_engine = { path = "../Chess_Engine" }
 bot_controller = { path = "../Bot_Controller"}
 
-[dev-dependencies]
-criterion = "0.8.2"
 
-[[bench]]
-name = "move_generation_bench"
-harness = false
