@@ -4,7 +4,7 @@ use raylib::trace_log;
 use crate::board::gamestate::GameResult;
 use crate::board::piece::{Piece, PieceType};
 use crate::board::r#move::{LogMove, Move};
-use crate::board::{Board, STARTFEN};
+use crate::board::Board;
 use crate::board::utilities::TimeControl;
 use std::cmp::max;
 use std::time::*;
@@ -330,7 +330,7 @@ impl Board {
         let mut number: i32 = 1;
 
         let mut board = Board::new(None);
-        board.load_fen(STARTFEN);
+        board.load_fen(&board.start_fen.clone());
         board.start_game(TimeControl::Unlimited);
 
         for m in self.move_log.iter() {
