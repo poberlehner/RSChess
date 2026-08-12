@@ -6,6 +6,5 @@ edition = "2024"
 [dependencies]
 raylib = "6.0.0"
 chess_engine = { path = "../Chess_Engine" }
-bot_controller = { path = "../Bot_Controller"}
-
-
+bot_controller = { path = "../Bot_Controller" }
+uci_engine = { path = "../UCI_Engine" }

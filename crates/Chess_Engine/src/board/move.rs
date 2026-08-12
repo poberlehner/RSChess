@@ -6,7 +6,7 @@ pub enum Direction {
     North = 0,
     East = 1,
     South = 2,
-    West = 3, 
+    West = 3,
     Northeast = 4,
     Southeast = 5,
     Southwest = 6,
@@ -29,7 +29,7 @@ pub struct LogMove {
     pub origin_square: u8,
     pub destination_square: u8,
     pub promotion_type: PieceType,
-    
+
     pub moved_piece: Piece,
     pub captured_piece: Option<Piece>,
 
@@ -64,6 +64,20 @@ impl Move {
 
         string
     }
+
+    ///string must be in the UCI format
+    pub fn from_str(string: &str) -> Move {
+        let mut m = Move { origin_square: 0, destination_square: 0, promotion_type: PieceType::None };
+
+        let chars = string.chars().collect::<Vec<char>>();
+        m.origin_square = Board::file_char_to_index(chars[0]).unwrap() as u8 + (chars[1].to_digit(10).unwrap() - 1) as u8 * 8;
+        m.destination_square = Board::file_char_to_index(chars[2]).unwrap() as u8 + (chars[3].to_digit(10).unwrap() - 1) as u8 * 8;
+        if chars.len() == 5 {
+            m.promotion_type = Board::char_to_piece(chars[4]).unwrap().piece_type;
+        }
+
+        m
+    }
 }
 
 impl LogMove {
@@ -74,7 +88,7 @@ impl LogMove {
             promotion_type: self.promotion_type
         }
     }
-    
+
     pub fn null_move() -> Self {
         LogMove {
             null_move: true,

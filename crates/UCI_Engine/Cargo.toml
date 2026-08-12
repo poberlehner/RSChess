@@ -1,0 +1,9 @@
+[package]
+name = "uci_engine"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chess_engine = { path = "../Chess_Engine" }
+chess_bot    = { path = "../Chess_Bot"    }
+rand         = "0.10.2"
