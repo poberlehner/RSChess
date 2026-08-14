@@ -1,7 +1,10 @@
+use log::*;
 use crate::board::gamestate::GameResult;
 use crate::board::piece::{Piece, PieceType};
 use crate::board::Board;
 use std::time::Duration;
+#[cfg(debug_assertions)]
+use std::time::Instant;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum TimeControl
@@ -34,43 +37,62 @@ pub enum TimeControl
 
 impl Board {
     #[inline(always)]
-    pub fn column_char_to_index(column: char) -> Option<usize> {
+    pub fn column_char_to_index(column: char) -> usize {
         match column {
-            'a' => { Some(0) }
-            'b' => { Some(1) }
-            'c' => { Some(2) }
-            'd' => { Some(3) }
-            'e' => { Some(4) }
-            'f' => { Some(5) }
-            'g' => { Some(6) }
-            'h' => { Some(7) }
-            _ => { None }
+            'a' => { 0 }
+            'b' => { 1 }
+            'c' => { 2 }
+            'd' => { 3 }
+            'e' => { 4 }
+            'f' => { 5 }
+            'g' => { 6 }
+            'h' => { 7 }
+            _ => {
+                error!("Tried to convert invalid column char '{}' to an index", column);
+                0
+            }
         }
     }
 
     #[inline(always)]
-    pub fn file_char_to_index(file: char) -> Option<usize> {
+    pub fn file_char_to_index(file: char) -> usize {
         Self::column_char_to_index(file)
+    }
+
+    #[inline(always)]
+    pub fn valid_file_char(c: char) -> bool {
+        match c {
+            '0'..='9' => { true }
+            _ => { false }
+        }
+    }
+
+    #[inline(always)]
+    pub fn valid_column_char(c: char) -> bool {
+        Self::valid_file_char(c)
     }
 
     //The return value is lowercase
     #[inline(always)]
-    pub fn column_index_to_char(column: i32) -> Option<char> {
+    pub fn column_index_to_char(column: i32) -> char {
         match column {
-            0 => { Some('a') }
-            1 => { Some('b') }
-            2 => { Some('c') }
-            3 => { Some('d') }
-            4 => { Some('e') }
-            5 => { Some('f') }
-            6 => { Some('g') }
-            7 => { Some('h') }
-            _ => { None }
+            0 => { 'a' }
+            1 => { 'b' }
+            2 => { 'c' }
+            3 => { 'd' }
+            4 => { 'e' }
+            5 => { 'f' }
+            6 => { 'g' }
+            7 => { 'h' }
+            _ => {
+                error!("Tried to convert invalid column index '{}'to char", column);
+                'a'
+            }
         }
     }
 
     #[inline(always)]
-    pub fn file_index_to_char(file: i32) -> Option<char> {
+    pub fn file_index_to_char(file: i32) -> char {
         Self::column_index_to_char(file)
     }
 
@@ -78,7 +100,7 @@ impl Board {
     pub fn square_index_to_chars(index: u8) -> [char; 2] {
         let mut result: [char; 2] = ['0', '0'];
 
-        result[0] = Self::column_index_to_char((index % 8) as i32).expect("Invalid coordinate");
+        result[0] = Self::column_index_to_char((index % 8) as i32);
         result[1] = char::from_digit(((index / 8) as i32 + 1) as u32, 10).expect("Invalid coordinate");
 
         result
@@ -88,7 +110,7 @@ impl Board {
     pub fn square_index_to_string(index: u8) -> String {
         let mut result: String = String::from("");
 
-        result.push(Self::column_index_to_char((index % 8) as i32).expect("Invalid coordinate"));
+        result.push(Self::column_index_to_char((index % 8) as i32));
         result.push(char::from_digit(((index / 8) as i32 + 1) as u32, 10).expect("Invalid coordinate"));
 
         result
@@ -100,30 +122,36 @@ impl Board {
     }
 
     #[inline(always)]
-    pub fn piece_to_char(piece: Piece) -> Option<char> {
+    pub fn piece_to_char(piece: Piece) -> char {
         match piece.piece_type {
-            PieceType::King => { if piece.white_piece { Some('K') } else { Some('k') } },
-            PieceType::Queen => { if piece.white_piece { Some('Q') } else { Some('q') } },
-            PieceType::Rook => { if piece.white_piece { Some('R') } else { Some('r') } },
-            PieceType::Knight => { if piece.white_piece { Some('N') } else { Some('n') } },
-            PieceType::Bishop => { if piece.white_piece { Some('B') } else { Some('b') } },
-            PieceType::Pawn => { if piece.white_piece { Some('P') } else { Some('p') } },
-            _ => { None }
+            PieceType::King => { if piece.white_piece { 'K' } else { 'k' } },
+            PieceType::Queen => { if piece.white_piece { 'Q' } else { 'q' } },
+            PieceType::Rook => { if piece.white_piece { 'R' } else { 'r' } },
+            PieceType::Knight => { if piece.white_piece { 'N' } else { 'n' } },
+            PieceType::Bishop => { if piece.white_piece { 'B' } else { 'b' } },
+            PieceType::Pawn => { if piece.white_piece { 'P' } else { 'p' } },
+            PieceType::None => {
+                warn!("Converting PieceType::None to a char ('0') which might lead to unintended behaviour");
+                '0'
+            }
         }
     }
 
     #[inline(always)]
-    pub fn char_to_piece(ch: char) -> Option<Piece> {
+    pub fn char_to_piece(ch: char) -> Piece {
         let c = ch.to_lowercase().last().unwrap();
 
         match c {
-            'k' => { Some(Piece { piece_type: PieceType::King, white_piece: ch.is_uppercase() }) }
-            'q' => { Some(Piece { piece_type: PieceType::Queen, white_piece: ch.is_uppercase() }) }
-            'r' => { Some(Piece { piece_type: PieceType::Rook, white_piece: ch.is_uppercase() }) }
-            'n' => { Some(Piece { piece_type: PieceType::Knight, white_piece: ch.is_uppercase() }) }
-            'b' => { Some(Piece { piece_type: PieceType::Bishop, white_piece: ch.is_uppercase() }) }
-            'p' => { Some(Piece { piece_type: PieceType::Pawn, white_piece: ch.is_uppercase() }) }
-            _ => { None }
+            'k' => { Piece { piece_type: PieceType::King, white_piece: ch.is_uppercase() } }
+            'q' => { Piece { piece_type: PieceType::Queen, white_piece: ch.is_uppercase() } }
+            'r' => { Piece { piece_type: PieceType::Rook, white_piece: ch.is_uppercase() } }
+            'n' => { Piece { piece_type: PieceType::Knight, white_piece: ch.is_uppercase() } }
+            'b' => { Piece { piece_type: PieceType::Bishop, white_piece: ch.is_uppercase() } }
+            'p' => { Piece { piece_type: PieceType::Pawn, white_piece: ch.is_uppercase() } }
+            _ => {
+                error!("Unable to convert invalid char '{}' to a chess piece", ch);
+                Piece { piece_type: PieceType::None, white_piece: false }
+            }
         }
     }
 
@@ -157,6 +185,9 @@ impl Board {
     }
 
     pub fn load_fen(&mut self, fen: &str) {
+        #[cfg(debug_assertions)]
+        let start_time = Instant::now();
+
         self.start_fen = fen.to_string();
         self.squares = [None; 64];
 
@@ -271,7 +302,12 @@ impl Board {
             index += 2;
         }
         else {
-            self.game_state.en_passant_square = Some(Board::column_char_to_index(chars[index]).expect("Invalid column letter in FEN string") as u8 + 8 * chars[index + 1].to_digit(10).expect("Not a valid row index in FEN String") as u8);
+            if Self::valid_file_char(chars[index]) {
+                warn!("Invalid file char on index {index} of fen string \"{fen}\"");
+            }
+
+            self.game_state.en_passant_square = Some(Board::column_char_to_index(chars[index]) as u8 +
+                8 * chars[index + 1].to_digit(10).expect("Not a valid row index in FEN String") as u8);
             index += 3;
         }
 
@@ -293,14 +329,18 @@ impl Board {
 
         self.invalidate_caches();
 
+        #[cfg(debug_assertions)]
+        trace!("Load fen string \"{}\" in {}µs", fen, start_time.elapsed().as_micros());
+
         self.game_result = GameResult::NotStarted;
     }
 
     #[allow(unused)]
     pub fn generate_fen(&self) -> String {
+        #[cfg(debug_assertions)]
+        let start_time = Instant::now();
         let mut fen: String = String::from("");
 
-        //Go back to front when switching to a flattened Array due to a wrong color positioning
         for y in 0..8 {
             let mut empty_squares = 0;
             for x in 0..8 {
@@ -311,7 +351,7 @@ impl Board {
 
                     empty_squares = 0;
 
-                    fen.push(Self::piece_to_char(self.squares[x + (7 - y) * 8].unwrap()).expect(&format!("Invalid piece on square ({}, {})", x, y)));
+                    fen.push(Self::piece_to_char(self.squares[x + (7 - y) * 8].unwrap()));
                 }
                 else {
                     empty_squares += 1;
@@ -360,8 +400,13 @@ impl Board {
         fen.push(' ');
 
         if self.game_state.en_passant_square.is_some() {
-            fen.push(Self::column_index_to_char((self.game_state.en_passant_square.unwrap() % 8) as i32).expect("Invalid column in en passant square"));
-            fen.push((self.game_state.en_passant_square.unwrap() / 8).to_string().pop().unwrap());
+            if self.game_state.en_passant_square.unwrap() % 8 >= 8 {
+                warn!("Invalid en passant square");
+            }
+            else {
+                fen.push(Self::column_index_to_char((self.game_state.en_passant_square.unwrap() % 8) as i32));
+                fen.push((self.game_state.en_passant_square.unwrap() / 8).to_string().pop().unwrap());
+            }
         }
         else {
             fen.push('-');
@@ -374,6 +419,9 @@ impl Board {
         fen.push(' ');
 
         fen.push_str(self.game_state.next_move_number.to_string().as_str());
+
+        #[cfg(debug_assertions)]
+        trace!("Generated fen string \"{}\" in {}µs", fen, start_time.elapsed().as_micros());
 
         fen
     }

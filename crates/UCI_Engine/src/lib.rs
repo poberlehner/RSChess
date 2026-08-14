@@ -3,6 +3,7 @@ use std::thread::JoinHandle;
 use std::sync::{Arc, Mutex};
 use chess_engine::board::{Board, STARTFEN, r#move::Move, utilities::TimeControl};
 use chess_bot::bot::Bot;
+use log::warn;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 
@@ -18,8 +19,8 @@ pub struct UCIController {
 
 impl UCIController {
     pub fn new() -> UCIController {
-        UCIController { 
-            board: Board::new(None),
+        UCIController {
+            board: Board::new(),
             bot: Bot::new(),
 
             bot_thread: None,
@@ -67,6 +68,7 @@ impl UCIController {
                 }
                 "stop" => {
                     eprintln!("RSChess cannot stop its search early yet");
+                    warn!("RSChess cannot stop its search early yet");
                 }
                 "d" => {
                     println!("{}", self.board.generate_fen());
@@ -110,10 +112,10 @@ impl UCIController {
     #[allow(unused)]
     fn process_go_cmd(&mut self, commands: &mut Vec<&str>) {
         todo!();
-        
+
         match commands[1] {
             "infinite" => {
-                
+
             }
             _ => {}
         }

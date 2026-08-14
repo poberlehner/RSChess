@@ -1,64 +1,32 @@
-use chess_engine::board::STARTFEN;
-use chess_engine::board::gamestate::GameResult;
-use chess_engine::board::r#move::Move;
-use chess_engine::board::utilities::TimeControl;
+use chess_engine::board::{
+    STARTFEN,
+    gamestate::GameResult,
+    r#move::Move,
+    utilities::TimeControl
+};
 use chrono::prelude::*;
+use log::*;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 use raylib::core::RaylibHandle;
-use raylib::ffi::GetRandomValue;
-use raylib::ffi::GuiControl::DEFAULT;
-use raylib::ffi::GuiDefaultProperty::TEXT_SIZE;
+use raylib::ffi::{GetRandomValue, GuiControl::DEFAULT, GuiDefaultProperty::TEXT_SIZE};
 use raylib::prelude::*;
-use std::env;
-use std::fs::*;
-use std::io::Write;
-use std::panic;
-use std::panic::PanicHookInfo;
-use std::path::PathBuf;
-use std::thread::JoinHandle;
-use std::thread::spawn;
-use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use raylib::prelude::TraceLogLevel;
+use std::{
+    env,
+    fs::*,
+    io::Write,
+    panic,
+    panic::PanicHookInfo,
+    path::PathBuf,
+    thread::{JoinHandle, spawn},
+    sync::{Arc, Mutex},
+    time::Instant
+};
 use chess_engine::board::Board;
 use chess_engine::renderer::Renderer;
 use chess_bot::bot::Bot;
 use chess_engine::bot::ChessBot;
-
-fn custom_trace_log_callback(log_level: TraceLogLevel, string: &str) {
-    if let Ok(mut log_file) = OpenOptions::new().append(true).create(true).write(true).open("assets/Chess.log") {
-
-        match log_level {
-            TraceLogLevel::LOG_ALL => {
-                log_file.write("[FULL] : ".as_ref()).expect("Failed to write to log file");
-            }
-            TraceLogLevel::LOG_TRACE => {
-                log_file.write("[TRACE] ".as_ref()).expect("Failed to write to log file");
-            }
-            TraceLogLevel::LOG_DEBUG => {
-                log_file.write("[DEBUG] ".as_ref()).expect("Failed to write to log file");
-            }
-            TraceLogLevel::LOG_INFO => {
-                log_file.write("[INFO] ".as_ref()).expect("Failed to write to log file");
-            }
-            TraceLogLevel::LOG_WARNING => {
-                log_file.write("[WARN] ".as_ref()).expect("Failed to write to log file");
-            }
-            TraceLogLevel::LOG_ERROR => {
-                log_file.write("[ERROR] ".as_ref()).expect("Failed to write to log file");
-            }
-            TraceLogLevel::LOG_FATAL => {
-                log_file.write("[FATAL] ".as_ref()).expect("Failed to write to log file");
-            }
-            _ => { }
-        }
-
-        let time = Local::now();
-        let time_str = time.to_string();
-
-        log_file.write(["[".as_bytes(), time_str.as_bytes(), "] : ".as_bytes(), string.as_bytes(), "\n".as_bytes()].concat().as_ref()).expect("Failed to write to log file");
-    }
-}
 
 fn custom_panic_hook(panic_info: &PanicHookInfo) {
     if let Ok(mut log_file) = OpenOptions::new().append(true).create(true).write(true).open("assets/Chess.log") {
@@ -77,6 +45,8 @@ fn custom_panic_hook(panic_info: &PanicHookInfo) {
 pub struct BotController {
     raylib_handle: RaylibHandle,
     raylib_thread: RaylibThread,
+
+    frame_times: Vec<f32>,
 
     ///Only for the bot as the bot_thread keeps it locked for it's entire runtime
     bot_rng: Arc<Mutex<StdRng>>,
@@ -103,6 +73,7 @@ impl BotController {
     fn initialize_context() -> BotController {
         let start_time = Instant::now();
         let (mut rl, thread) = init()
+            .log_level(TraceLogLevel::LOG_WARNING)
             .size(1920, 1080)
             .title("Chess")
             .resizable()
@@ -111,18 +82,14 @@ impl BotController {
 
         rl.gui_set_style(DEFAULT, TEXT_SIZE, 20);
 
-        set_trace_log_callback(custom_trace_log_callback).expect("Unable to set custom logging functions");
-
         panic::set_hook(Box::new(custom_panic_hook));
 
         Self::initialize_working_directory();
 
         rl.set_target_fps(120);
-        trace_log(TraceLogLevel::LOG_INFO, format!("Controller init: Window init time: {:?}", start_time.elapsed()).as_str());
+        info!("Window creation took {}ms", start_time.elapsed().as_millis());
 
-        let start_time = Instant::now();
-        let board = Board::new(Some(&mut rl));
-        trace_log(TraceLogLevel::LOG_INFO, format!("Controller init: Board init time: {:?}", start_time.elapsed()).as_str());
+        let board = Board::new();
 
         let renderer = Renderer::new(&mut rl, &thread, "assets/Pieces.png".parse().unwrap(),
             130,Color { r: 171, g: 121, b: 101, a: 255 },
@@ -131,6 +98,8 @@ impl BotController {
         BotController {
             raylib_handle: rl,
             raylib_thread: thread,
+
+            frame_times: vec![],
 
             bot_rng: Arc::new(Mutex::new(StdRng::seed_from_u64(15))),
 
@@ -146,20 +115,19 @@ impl BotController {
     }
 
     fn initialize_working_directory() {
-        //Handling the working directory
         let current_directory = env::current_dir();
-        if current_directory.is_err() {
-            trace_log(TraceLogLevel::LOG_FATAL, "Failed to get current working directory");
+
+        if let Ok(mut working_dir) = current_directory {
+            while !(exists(working_dir.join(PathBuf::from("assets"))).is_ok() && exists(working_dir.join(PathBuf::from("assets"))).unwrap()) {
+                working_dir.pop();
+            }
+
+            env::set_current_dir(working_dir).expect("Failed to set current working directory");
         }
-        let mut current_directory = current_directory.unwrap();
-
-        while !(exists(current_directory.join(PathBuf::from("assets"))).is_ok() && exists(current_directory.join(PathBuf::from("assets"))).unwrap()) {
-            trace_log(TraceLogLevel::LOG_ERROR, format!("Current directory: {:?}", current_directory).as_str());
-
-             current_directory.pop();
+        else {
+            error!("Failed to get current working directory");
+            error!("This might cause assets, logs or other files to not be loaded or saved correctly");
         }
-
-        env::set_current_dir(current_directory).expect("Failed to set current working directory");
     }
 
     fn initialize_chess(&mut self) {
@@ -203,7 +171,7 @@ impl BotController {
 
                     if self.board.get_game_result_simplified() != -1 {
                         let competitors = if self.bot_color_white { ("Human", "RSChess Bot") } else { ("RSChess Bot", "Human") };
-                        self.board.save_game(String::from("assets/Games.pgn"), 
+                        self.board.save_game(String::from("assets/Games.pgn"),
                             Some("RSChess Human vs. Bot"), Some(competitors), None);
                     }
 
@@ -213,8 +181,6 @@ impl BotController {
 
             self.draw(allow_moving);
         }
-
-        self.renderer.unload_textures();
     }
 
     pub fn run_bot_vs_bot(&mut self) {
@@ -236,7 +202,7 @@ impl BotController {
             }
 
             if self.board.get_game_result_simplified() != -1 {
-                self.board.save_game(String::from("assets/Games.pgn"), 
+                self.board.save_game(String::from("assets/Games.pgn"),
                     Some("RSChess Bot vs. Bot"), Some(("RSChess Bot", "RSChess Bot")), None);
                 self.board.load_fen(STARTFEN);
                 self.board.start_game(TimeControl::Unlimited);
@@ -258,8 +224,6 @@ impl BotController {
 
             self.draw(false);
         }
-
-        self.renderer.unload_textures();
     }
 
     pub fn run_human_vs_human(&mut self) {
@@ -272,8 +236,6 @@ impl BotController {
 
             self.draw(true);
         }
-
-        self.renderer.unload_textures();
     }
 
     fn draw(&mut self, allow_moving: bool) {
@@ -290,5 +252,18 @@ impl BotController {
         self.renderer.update_gui(&mut self.board, &mut draw_handle, allow_moving);
 
         draw_handle.draw_fps(20, 20);
+
+        self.frame_times.push(draw_handle.get_frame_time());
+    }
+}
+
+impl Drop for BotController {
+    fn drop(&mut self) {
+        self.frame_times.remove(0);
+        let sum: f32 = self.frame_times.iter().sum();
+        let avg = sum / self.frame_times.len() as f32;
+        info!("Average frame times: {avg}s");
+
+        self.renderer.unload_textures();
     }
 }

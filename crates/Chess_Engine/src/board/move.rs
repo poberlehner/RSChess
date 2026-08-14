@@ -1,3 +1,4 @@
+use log::*;
 use std::time::Duration;
 use crate::board::Board;
 use crate::board::piece::{Piece, PieceType};
@@ -70,10 +71,20 @@ impl Move {
         let mut m = Move { origin_square: 0, destination_square: 0, promotion_type: PieceType::None };
 
         let chars = string.chars().collect::<Vec<char>>();
-        m.origin_square = Board::file_char_to_index(chars[0]).unwrap() as u8 + (chars[1].to_digit(10).unwrap() - 1) as u8 * 8;
-        m.destination_square = Board::file_char_to_index(chars[2]).unwrap() as u8 + (chars[3].to_digit(10).unwrap() - 1) as u8 * 8;
+
+        if !Board::valid_file_char(chars[0]) || !Board::valid_file_char(chars[2]) {
+            warn!("Invalid file char in move string \"{string}\"")
+        }
+
+        m.origin_square = Board::file_char_to_index(chars[0]) as u8 + (chars[1].to_digit(10).unwrap_or(0) - 1) as u8 * 8;
+        m.destination_square = Board::file_char_to_index(chars[2]) as u8 + (chars[3].to_digit(10).unwrap_or(0) - 1) as u8 * 8;
         if chars.len() == 5 {
-            m.promotion_type = Board::char_to_piece(chars[4]).unwrap().piece_type;
+            m.promotion_type = Board::char_to_piece(chars[4]).piece_type;
+        }
+
+        if m.origin_square >= 8 || m.destination_square >= 8 {
+            error!("Invalid input to Move::from_str: {}", string);
+            return Move { origin_square: 0, destination_square: 0, promotion_type: PieceType::None };
         }
 
         m

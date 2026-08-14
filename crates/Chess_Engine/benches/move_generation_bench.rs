@@ -13,7 +13,7 @@ fn bench_board_fn(board: &mut Board) {
 }
 
 fn move_generation_bench(c: &mut Criterion) {
-    let mut board = Board::new(None);
+    let mut board = Board::new();
 
     let mut group = c.benchmark_group("Move generation");
 
@@ -36,7 +36,7 @@ pub fn move_generation_recursive_bench(c: &mut Criterion) {
 
     env::set_current_dir(current_directory).expect("Failed to set current working directory");
 
-    let mut board: Board = Board::new(None);
+    let mut board: Board = Board::new();
 
     board.start_game(TimeControl::Unlimited);
 

@@ -3,21 +3,14 @@ use crate::board::Board;
 use crate::board::utilities::TimeControl::Unlimited;
 use crate::board::zobrist::Zobrist;
 use chrono::Local;
-use raylib::callbacks::TraceLogLevel;
-use raylib::core::RaylibHandle;
+use log::*;
 use std::time::{Duration, Instant};
-use raylib::trace_log;
 
 impl Board {
-    pub fn new(raylib_handle: Option<&mut RaylibHandle>) -> Board {
-        let start_time = Instant::now();
+    pub fn new() -> Board {
+        let total_start_time = Instant::now();
+        let mut start_time = Instant::now();
 
-        if raylib_handle.is_some() {
-            //raylib_handle.unwrap().trace_log(TraceLogLevel::LOG_INFO, format!("Board init: Texture loading time: {:?}", start_time.elapsed()).as_str());
-            trace_log(TraceLogLevel::LOG_INFO, format!("Board init: Texture loading time: {:?}", start_time.elapsed()).as_str());
-        }
-
-        let start_time = Instant::now();
         let mut board = Board {
             squares: [None; 64],
 
@@ -29,7 +22,7 @@ impl Board {
                 fifty_move_counter: 0,
                 next_move_number: 1,
             },
-            
+
             time_control: Unlimited,
             white_used_time: Duration::new(0, 0),
             black_used_time: Duration::new(0, 0),
@@ -67,20 +60,26 @@ impl Board {
             black_pieces_bitboard: None,
         };
 
+        trace!("board creation took {}µs", start_time.elapsed().as_micros());
+
         board.load_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+
+        start_time = Instant::now();
 
         board.move_log.reserve(40);
 
         board.precompute_distance_to_edge_data();
         board.precompute_knight_jump_legality();
 
+        trace!("Precomputation took {}µs", start_time.elapsed().as_micros());
+        start_time = Instant::now();
+
         board.generate_all_bitboards();
         board.generate_pieces_bitboard(true);
         board.generate_pieces_bitboard(false);
 
-        if raylib_handle.is_some() {
-           trace_log(TraceLogLevel::LOG_INFO, format!("Board init: FEN loading time: {:?}", start_time.elapsed()).as_str());
-        }
+        trace!("Bitboard generation took {}µs", start_time.elapsed().as_micros());
+        info!("Board init took {}µs", total_start_time.elapsed().as_micros());
 
         board
     }

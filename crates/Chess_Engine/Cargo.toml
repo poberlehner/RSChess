@@ -7,9 +7,11 @@ edition = "2024"
 raylib = { version = "6.0.0", features= ["raygui", "default"] }
 rand = "0.10.2"
 chrono = "0.4.45"
+log = "0.4.33"
 
 [dev-dependencies]
 criterion = "0.8.2"
+env_logger = "0.11.11"
 
 [[bench]]
 name = "move_generation_bench"

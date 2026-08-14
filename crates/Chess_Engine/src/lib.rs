@@ -6,9 +6,12 @@ pub mod bot;
 mod tests {
     use crate::board::{Board, utilities::TimeControl};
     use std::env;
-    use std::fs::exists;
+    use std::fs::{exists, File};
     use std::io::Write;
     use std::path::PathBuf;
+    use env_logger;
+    #[allow(unused)]
+    use log::*;
     use crate::board::r#move::{LogMove, Move};
 
     #[test]
@@ -22,7 +25,11 @@ mod tests {
 
         env::set_current_dir(current_directory).expect("Failed to set current working directory");
 
-        let mut board: Board = Board::new(None);
+
+        let log_file = File::options().append(true).create(true).write(true).open("assets/Chess.log").expect("Failed to open log file");
+        env_logger::Builder::new().target(env_logger::Target::Pipe(Box::new(log_file))).filter_level(log::LevelFilter::Trace).init();
+
+        let mut board: Board = Board::new();
 
         let num_positions: u64;
 
@@ -39,13 +46,13 @@ mod tests {
 
         println!("Number of positions encountered: {}", num_positions);
 
-        std::io::stdout().flush().expect("panic message");
+        std::io::stdout().flush().expect("Failed to flush stdout");
     }
 
     fn recursive_move_generation_test
         (board: &mut Board, depth: u32, max_depth: u32, move_log: &mut Vec<(Move, u32)>, undo_move_log: &mut Vec<(LogMove, u32)>) -> u64
     {
-        let legal_moves = board.get_legal_moves().clone().expect("Cloning the legal move vector failed (in recursive function)");
+        let legal_moves = board.get_legal_moves().clone().expect("Cloning the legal move vector failed");
 
         if depth == 1 {
             return legal_moves.len() as u64;
@@ -62,7 +69,8 @@ mod tests {
             // move_log.push((legal_move, max_depth - depth));
             if !board.make_move(legal_move, true) {
                 // if !undo_move_log.is_empty() {
-                    // eprintln!("Last undone move: {:?}", undo_move_log[undo_move_log.len() - 1]);
+                //     eprintln!("Last undone move: {:?}", undo_move_log[undo_move_log.len() - 1]);
+                //     warn!("Make move failed after undoing move {:?}", undo_move_log[undo_move_log.len() - 1]);
                 // }
                 // eprintln!("Executing move {} failed (depth: {})", legal_move.to_string(), max_depth - depth);
             }
@@ -72,9 +80,6 @@ mod tests {
 
             if depth == max_depth {
                 eprintln!("{}: {}", legal_move.to_string(), num_new_positions);
-            }
-            else {
-                // println!("Aux: {}: {}", legal_move.to_string(), num_new_positions);
             }
 
             // undo_move_log.push((board.undo_move(true).unwrap(), max_depth - depth));

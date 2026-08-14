@@ -2,6 +2,8 @@ mod gui;
 mod drawing;
 mod promotionpopup;
 
+use std::time::Instant;
+use log::info;
 use raylib::color::Color;
 use raylib::math::Rectangle;
 use raylib::prelude::*;
@@ -39,6 +41,7 @@ impl Renderer
                texture_atlas_path: String, square_size: u32, black_square_color: Color,
                white_square_color: Color) -> Self
     {
+        let start_time = Instant::now();
         let renderer: Renderer = Renderer {
             textures: Some(Self::load_piece_textures(rl, thread, texture_atlas_path, 334)),
             square_size,
@@ -56,6 +59,8 @@ impl Renderer
             black_square_color,
             white_square_color,
         };
+
+        info!("Renderer init took {}ms", start_time.elapsed().as_millis());
 
         renderer
     }

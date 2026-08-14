@@ -6,13 +6,13 @@ use crate::board::Board;
 use crate::board::utilities::TimeControl;
 use crate::renderer::promotionpopup::PromotionPopup;
 use crate::renderer::Renderer;
+use log::*;
 use raylib::consts::MouseButton;
 use raylib::core::RaylibHandle;
 use raylib::drawing::RaylibDrawHandle;
 use raylib::ffi::KeyboardKey::{KEY_LEFT, KEY_R, KEY_S, KEY_T};
-use raylib::prelude::{Color, TraceLogLevel, Vector2};
+use raylib::prelude::{Color, Vector2};
 use raylib::rgui::RaylibGuiControls;
-use raylib::trace_log;
 
 //Interface functions
 impl Renderer {
@@ -74,7 +74,7 @@ impl Renderer {
                 self.promotion_move = None;
             }
             else {
-                trace_log(TraceLogLevel::LOG_WARNING, "promotion_popup is some while promotion_move is none");
+                warn!("Promotion popup exists while the promotion type does not");
                 self.promotion_popup = None;
             }
 

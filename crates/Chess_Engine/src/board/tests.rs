@@ -1,8 +1,10 @@
+use log::{info, warn};
+
 use crate::board::Board;
 
 impl Board {
     pub fn test_duplicate_moves(&mut self) {
-        let legal_moves = self.get_legal_moves().as_ref().expect("Unable to get legal moves");
+        let legal_moves = self.get_legal_moves().as_ref().expect("Unable to get legal moves").clone();
 
         for i in 0..legal_moves.len() {
             for j in 0..legal_moves.len() {
@@ -10,6 +12,7 @@ impl Board {
                     if legal_moves[i] == legal_moves[j] {
                         eprintln!("Move duplicate: {} -> {}",Self::square_index_to_chars(legal_moves[i].origin_square).iter().collect::<String>(),
                             Self::square_index_to_chars(legal_moves[j].destination_square).iter().collect::<String>());
+                        warn!("Move duplicate {} in Position \"{}\"", legal_moves[i].to_string(), self.generate_fen());
                     }
                 }
             }
@@ -22,7 +25,7 @@ impl Board {
         let mut failure_count = 0;
 
         for test_fen in test_fen_strings.iter() {
-            let mut board = Board::new(None);
+            let mut board = Board::new();
 
             board.load_fen(test_fen);
 
@@ -32,14 +35,18 @@ impl Board {
                 failure_count += 1;
                 eprintln!("Input : {}", test_fen);
                 eprintln!("Result: {}", result);
+                warn!("Fen input : {}", test_fen);
+                warn!("Fen Result: {}", result);
             }
         }
 
         if failure_count > 0 {
             println!("{} Test failed", failure_count);
+            warn!("{} Fen tests failed", failure_count);
         }
         else {
             println!("All fen tests succeeded");
+            info!("All fen tests succeeded");
         }
     }
 }

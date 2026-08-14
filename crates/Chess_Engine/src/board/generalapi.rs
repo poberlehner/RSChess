@@ -1,6 +1,5 @@
 use chrono::{Datelike, Local, Timelike};
-use raylib::ffi::TraceLogLevel::{self, LOG_INFO};
-use raylib::trace_log;
+use log::*;
 use crate::board::gamestate::GameResult;
 use crate::board::piece::{Piece, PieceType};
 use crate::board::r#move::{LogMove, Move};
@@ -18,6 +17,7 @@ impl Board {
             (self.game_result == GameResult::Repetition || self.game_result == GameResult::FiftyMoveRule)) {
             println!("The game is not running");
             println!("Game Result: {:?}", self.game_result);
+            warn!("Tried to make move {} in position \"{}\" while the game result is {:?}", m.to_string(), self.generate_fen(), self.game_result);
 
             self.move_log.push(LogMove::null_move());
 
@@ -32,6 +32,8 @@ impl Board {
             println!("Position: {}", self.generate_fen());
             println!("The Move: {} is not legal", m.to_string());
 
+            warn!("Tried to make move {} in position \"{}\"", m.to_string(), self.generate_fen());
+
             self.move_log.push(LogMove::null_move());
 
             return false;
@@ -39,6 +41,7 @@ impl Board {
 
         if !self.handle_time() {
             println!("No time left");
+            warn!("Tried to make move {} after timeout", m.to_string());
 
             self.move_log.push(LogMove::null_move());
 
@@ -97,11 +100,14 @@ impl Board {
             #[cfg(debug_assertions)]
             {
                 if m.promotion_type == PieceType::King {
-                    panic!("Promotion type is King");
+                    error!("Promotion type of move {} is set to king in position \"{}\"", m.to_string(), self.generate_fen());
+                    panic!("Invalid promotion type");
                 }
                 if self.squares[m.origin_square as usize]
-                    .expect("No piece at the Origin of the Move").piece_type != PieceType::Pawn {
-                    panic!("Non pawn piece with a promotion type other than none");
+                    .unwrap().piece_type != PieceType::Pawn {
+                    error!("Promotion type of move {} is set even though the move originates from {:?}",
+                            m.to_string(), self.squares[m.origin_square as usize].unwrap().piece_type);
+                    panic!("invalid promotion type");
                 }
             }
 
@@ -152,6 +158,7 @@ impl Board {
 
     pub fn undo_move(&mut self, _in_search: bool) -> Option<LogMove> {
         if self.move_log.is_empty() {
+            warn!("Tried to undo move while the move-log is empty");
             return None;
         }
 
@@ -329,7 +336,7 @@ impl Board {
         let mut result = "".to_string();
         let mut number: i32 = 1;
 
-        let mut board = Board::new(None);
+        let mut board = Board::new();
         board.load_fen(&board.start_fen.clone());
         board.start_game(TimeControl::Unlimited);
 
@@ -422,8 +429,8 @@ impl Board {
     pub fn save_game(&mut self, save_file: String, event: Option<&str>, competitors: Option<(&str, &str)>, round: Option<&str>) {
         let pgn_file = std::fs::File::options().append(true).create(true).write(true).open(&save_file);
 
-        if pgn_file.is_err() {
-        trace_log(TraceLogLevel::LOG_WARNING, &format!("Failed to load file \"{}\"", &save_file));
+        if let Err(err) = pgn_file {
+            warn!("Failed to open pgn save file: \"{}\" due to {}", &save_file, err);
             return;
         }
 
@@ -431,11 +438,13 @@ impl Board {
         let pgn = self.get_pgn(event, competitors, round);
 
         if let Err(err) = pgn_file.write(pgn.as_bytes()) {
-            trace_log(TraceLogLevel::LOG_ERROR, &format!("{}", err.to_string()));
+            error!("Failed to write to pgn save file \"{}\" due to {}", &save_file, err);
             return;
         }
 
-        pgn_file.write("\n\n".as_bytes()).expect("Second write to assets/Games.pgn failed");
+        if let Err(err) = pgn_file.write("\n\n".as_bytes()) {
+            error!("Failed second write to pgn save file \"{}\" due to {}", &save_file, err);
+        }
     }
 
     pub fn invalidate_caches(&mut self) {
@@ -642,7 +651,7 @@ impl Board {
             str.push(m.moved_piece.to_char_uppercase());
 
             if rank_eq_count >= 2 || (file_eq_count < 2 && eq_count >= 2) {
-                str.push(Self::file_index_to_char(m.origin_square as i32 % 8).unwrap());
+                str.push(Self::file_index_to_char(m.origin_square as i32 % 8));
             }
 
             if file_eq_count >= 2 {
@@ -651,7 +660,7 @@ impl Board {
         }
         else {
             if pawn_eq_count >= 2 || (m.captured_piece.is_some() && m.captured_piece.unwrap().piece_type != PieceType::None) || m.en_passant {
-                str.push(Self::file_index_to_char(m.origin_square as i32 % 8).unwrap());
+                str.push(Self::file_index_to_char(m.origin_square as i32 % 8));
             }
         }
 
@@ -659,11 +668,11 @@ impl Board {
             str.push('x')
         }
 
-        str.push_str(&format!("{}{}", Self::file_index_to_char(m.destination_square as i32 % 8).unwrap(), m.destination_square / 8 + 1));
+        str.push_str(&format!("{}{}", Self::file_index_to_char(m.destination_square as i32 % 8), m.destination_square / 8 + 1));
 
         if m.promotion_type != PieceType::None {
             str.push('=');
-            str.push(Self::piece_to_char(Piece { piece_type: m.promotion_type, white_piece: true }).unwrap());
+            str.push(Self::piece_to_char(Piece { piece_type: m.promotion_type, white_piece: true }));
         }
 
         str
@@ -688,7 +697,7 @@ impl Board {
                 self.game_result = GameResult::WhiteIsMated;
                 if !in_search {
                     println!("{blue}White Is Mated{reset}");
-                    trace_log(LOG_INFO, "White Is Mated");
+                    info!("White is mated");
                 }
 
                 return;
@@ -697,7 +706,7 @@ impl Board {
                 self.game_result = GameResult::BlackIsMated;
                 if !in_search {
                     println!("{blue}Black Is Mated{reset}");
-                    trace_log(LOG_INFO, "Black Is Mated");
+                    info!("Black is mated");
                 }
 
                 return;
@@ -720,7 +729,7 @@ impl Board {
 
                 if !in_search {
                     println!("{blue}Draw due to repetition{reset}");
-                    trace_log(LOG_INFO, "Draw due to repetition");
+                    info!("Draw due to repetition");
                 }
             }
         }
@@ -729,7 +738,7 @@ impl Board {
             self.game_result = GameResult::FiftyMoveRule;
             if !in_search {
                 println!("{blue}Draw by the fifty-move rule{reset}");
-                trace_log(LOG_INFO, "Draw by the fifty-move rule");
+                info!("Draw by the fifty-move rule");
             }
         }
 
@@ -738,7 +747,7 @@ impl Board {
             self.game_result = GameResult::InsufficientMaterial;
             if !in_search {
                 println!("{blue}Draw due to insufficient material{reset}");
-                trace_log(LOG_INFO, "Draw due to insufficient material");
+                info!("Draw due to insufficient material");
             }
         }
 
@@ -747,7 +756,7 @@ impl Board {
             self.game_result = GameResult::Stalemate;
             if !in_search {
                 println!("{blue}Draw due to stalemate{reset}");
-                trace_log(LOG_INFO, "Draw due to stalemate");
+                info!("Draw due to stalemate");
             }
         }
     }
@@ -815,13 +824,13 @@ impl Board {
                 if self.white_used_time >= time {
                     self.game_result = GameResult::WhiteTimeout;
                     println!("{blue}Black won by white Timeout{reset}");
-                    trace_log(LOG_INFO, "Black won by white Timeout");
+                    info!("Black won by white Timeout");
                     return false;
                 }
                 if self.black_used_time >= time {
                     self.game_result = GameResult::BlackTimeout;
                     println!("{blue}White won by black Timeout{reset}");
-                    trace_log(LOG_INFO, "White won by black Timeout");
+                    info!("White won by black Timeout");
                     return false;
                 }
 

@@ -1,10 +1,12 @@
+use log::*;
 use crate::board::Board;
 use crate::board::r#move::{DIR_INDEX_TO_OFFSET, KNIGHT_JUMP_OFFSETS, Move};
 use crate::board::piece::PieceType;
 
 impl Board {
     #[inline(always)]
-    fn add_move(&mut self, origin: u8, target: u8, promotion_type: PieceType, white: bool, pinned_orthogonal: bool, pinned_diagonal: bool, check: bool, moves: &mut Vec<Move>) {
+    fn add_move(&mut self, origin: u8, target: u8, promotion_type: PieceType, white: bool,
+        pinned_orthogonal: bool, pinned_diagonal: bool, check: bool, moves: &mut Vec<Move>) {
         if check {
             if 1 << target & self.get_check_block_bitboard(white) == 0 {
                 return;
@@ -178,7 +180,7 @@ impl Board {
                     }
                     PieceType::Pawn => {
                         if i <= 7 || i > 55 {
-                            panic!("A pawn managed to reach the last row");
+                            error!("A pawn managed to reach the last row \"{}\"", self.generate_fen());
                         }
 
                         let row_in_front = if piece.white_piece { i + 8 } else { i - 8 };
@@ -256,7 +258,7 @@ impl Board {
                         }
                     }
                     _ => {
-                        eprintln!("Piece on square ({}, {}) set to None", i % 8,i / 8);
+                        error!("Piece type of square {} is set to None", i);
                     }
                 }
             }
@@ -314,7 +316,6 @@ impl Board {
         &self.legal_moves
     }
 
-    #[allow(unreachable_code)]
     pub fn get_legal_moves_for_square(&mut self, square: u8) -> Vec<Move> {
         //Rewrite by simply filtering all moves
         let mut moves: Vec<Move> = vec![];
@@ -326,7 +327,6 @@ impl Board {
         }
 
         moves
-
 
         // let mut moves: Vec<Move> = vec![];
         //
