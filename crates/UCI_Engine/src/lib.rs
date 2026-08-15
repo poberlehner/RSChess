@@ -1,11 +1,8 @@
 use std::io::{self, Write, stdin, stdout};
 use std::thread::JoinHandle;
-use std::sync::{Arc, Mutex};
 use chess_engine::board::{Board, STARTFEN, r#move::Move, utilities::TimeControl};
 use chess_bot::bot::Bot;
 use log::warn;
-use rand::SeedableRng;
-use rand::rngs::StdRng;
 
 #[allow(unused)]
 pub struct UCIController {
@@ -13,7 +10,6 @@ pub struct UCIController {
     bot: Bot,
 
     ///Only for the bot as the bot_thread keeps it locked for it's entire runtime
-    bot_rng: Arc<Mutex<StdRng>>,
     bot_thread: Option<JoinHandle<Move>>,
 }
 
@@ -24,7 +20,6 @@ impl UCIController {
             bot: Bot::new(),
 
             bot_thread: None,
-            bot_rng: Arc::new(Mutex::new(StdRng::seed_from_u64(15)))
         }
     }
 

@@ -6,5 +6,4 @@ edition = "2024"
 [dependencies]
 chess_engine = { path = "../Chess_Engine" }
 chess_bot    = { path = "../Chess_Bot"    }
-rand         = "0.10.2"
 log          = "0.4.33"
