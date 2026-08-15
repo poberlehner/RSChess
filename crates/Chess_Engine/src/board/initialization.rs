@@ -24,8 +24,8 @@ impl Board {
             },
 
             time_control: Unlimited,
-            white_used_time: Duration::new(0, 0),
-            black_used_time: Duration::new(0, 0),
+            white_time_left: Duration::new(600, 0),
+            black_time_left: Duration::new(600, 0),
             move_start_time: Instant::now(),
 
             zobrist_history: vec![],

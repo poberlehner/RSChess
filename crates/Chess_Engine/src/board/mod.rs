@@ -28,8 +28,8 @@ pub struct Board {
 
     time_control: TimeControl,
     move_start_time: std::time::Instant,
-    white_used_time: std::time::Duration,
-    black_used_time: std::time::Duration,
+    white_time_left: std::time::Duration,
+    black_time_left: std::time::Duration,
 
     zobrist_history: Vec<i64>,
     zobrist: Zobrist,

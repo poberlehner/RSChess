@@ -39,13 +39,15 @@ impl Board {
             return false;
         }
 
-        if !self.handle_time() {
-            println!("No time left");
-            warn!("Tried to make move {} after timeout", m.to_string());
+        if !in_search {
+            if !self.handle_time() {
+                println!("No time left");
+                info!("Tried to make move {} after timeout", m.to_string());
 
-            self.move_log.push(LogMove::null_move());
+                self.move_log.push(LogMove::null_move());
 
-            return false;
+                return false;
+            }
         }
 
         let mut current_logmove: LogMove = LogMove {
@@ -156,7 +158,7 @@ impl Board {
         true
     }
 
-    pub fn undo_move(&mut self, _in_search: bool) -> Option<LogMove> {
+    pub fn undo_move(&mut self, in_search: bool) -> Option<LogMove> {
         if self.move_log.is_empty() {
             warn!("Tried to undo move while the move-log is empty");
             return None;
@@ -175,6 +177,15 @@ impl Board {
         }
 
         let piece = self.squares[last.destination_square as usize].expect("Invalid logged move");
+
+        if !in_search {
+            if piece.white_piece {
+                self.white_time_left += last.time_taken;
+            }
+            else {
+                self.black_time_left += last.time_taken;
+            }
+        }
 
         if self.game_result != GameResult::BlackIsMated && self.game_result != GameResult::WhiteIsMated {
             self.zobrist_history.pop();
@@ -262,8 +273,16 @@ impl Board {
             self.game_result = GameResult::InProgress;
 
             self.time_control = time_control;
-            self.white_used_time = Duration::new(0, 0);
-            self.black_used_time = Duration::new(0, 0);
+            match self.time_control {
+                TimeControl::Limited(time, _) => {
+                    self.white_time_left = time;
+                    self.black_time_left = time;
+                }
+                TimeControl::Unlimited => {
+                    self.white_time_left = Duration::from_hours(99999999);
+                    self.black_time_left = Duration::from_hours(99999999);
+                }
+            }
 
         }
     }
@@ -284,29 +303,29 @@ impl Board {
     ///Returns 0 when time_control is unlimited
     pub fn get_time_left(&self, white: bool) -> Duration {
         match self.time_control {
-            TimeControl::Limited(time, _) => {
+            TimeControl::Limited(_, _) => {
                 if white {
                     if self.game_state.white_to_move {
-                        if self.move_start_time.elapsed() > time - self.white_used_time {
+                        if self.move_start_time.elapsed() > self.white_time_left {
                             return Duration::new(0, 0);
                         }
 
-                        time - self.white_used_time - self.move_start_time.elapsed()
+                        return self.white_time_left - self.move_start_time.elapsed();
                     }
                     else {
-                        time - self.white_used_time
+                        return self.white_time_left;
                     }
                 }
                 else {
                     if self.game_state.white_to_move {
-                        time - self.black_used_time
+                        return self.black_time_left;
                     }
                     else {
-                        if self.move_start_time.elapsed() > time - self.black_used_time {
+                        if self.move_start_time.elapsed() > self.black_time_left {
                             return Duration::new(0, 0);
                         }
 
-                        time - self.black_used_time - self.move_start_time.elapsed()
+                        return self.black_time_left - self.move_start_time.elapsed();
                     }
                 }
             }
@@ -683,13 +702,7 @@ impl Board {
 impl Board {
     #[allow(unused)]
     fn handle_end_conditions(&mut self, in_search: bool,  logmove: &LogMove) {
-        // let red = "\x1b[31m";      // Red text
-        // let green = "\x1b[32m";    // Green text
-        // let yellow = "\x1b[33m";   // Yellow text
         let blue = "\x1b[34m";     // Blue text
-        // let magenta = "\x1b[35m";  // Magenta text
-        // let cyan = "\x1b[36m";     // Cyan text
-        // let white = "\x1b[37m";    // White text
         let reset = "\x1b[0m";     // Reset to default
 
         if self.checkmate() {
@@ -803,35 +816,33 @@ impl Board {
     //Returns true if there is time left
     fn handle_time(&mut self) -> bool {
         match self.time_control {
-            TimeControl::Limited(time, increment) => {
+            TimeControl::Limited(_, increment) => {
                 let blue = "\x1b[34m";     // Blue text
                 let reset = "\x1b[0m";     // Reset to default
 
                 if self.game_state.white_to_move {
-                    self.white_used_time += self.move_start_time.elapsed() - increment;
+                    if self.white_time_left <= self.move_start_time.elapsed() {
+                        self.white_time_left = Duration::new(0, 0);
+                        self.game_result = GameResult::WhiteTimeout;
+                        println!("{blue}Black won by white Timeout{reset}");
+                        info!("Black won by white Timeout");
+                        return false;
+                    }
+
+                    self.white_time_left -= self.move_start_time.elapsed();
+                    self.white_time_left += increment;
                 }
                 else {
-                    self.black_used_time += self.move_start_time.elapsed() - increment;
-                }
+                    if self.black_time_left <= self.move_start_time.elapsed() {
+                        self.black_time_left = Duration::new(0, 0);
+                        self.game_result = GameResult::BlackTimeout;
+                        println!("{blue}White won by black Timeout{reset}");
+                        info!("White won by black Timeout");
+                        return false;
+                    }
 
-                if self.white_used_time > time {
-                    self.white_used_time = time;
-                }
-                if self.black_used_time > time {
-                    self.black_used_time = time;
-                }
-
-                if self.white_used_time >= time {
-                    self.game_result = GameResult::WhiteTimeout;
-                    println!("{blue}Black won by white Timeout{reset}");
-                    info!("Black won by white Timeout");
-                    return false;
-                }
-                if self.black_used_time >= time {
-                    self.game_result = GameResult::BlackTimeout;
-                    println!("{blue}White won by black Timeout{reset}");
-                    info!("White won by black Timeout");
-                    return false;
+                    self.black_time_left -= self.move_start_time.elapsed();
+                    self.black_time_left += increment;
                 }
 
                 return true;
