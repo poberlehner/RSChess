@@ -1,3 +1,4 @@
+use log::*;
 use chess_engine::board::{r#move::Move, piece::PieceType};
 use chess_engine::bot::ChessBot;
 use chess_engine::board::Board;
@@ -60,7 +61,7 @@ static PIECE_SQUARE_TABLES: [[i64; 64]; 6] = [
 		-80, -70, -70, -70, -70, -70, -70, -80, ] //King
 ];
 
-static DEPTH: i32 = 4;
+static DEPTH: i32 = 5;
 static PIECE_VALUES: [i64; 6] = [100, 300, 300, 500, 900, 100000];
 
 impl Bot {
@@ -74,7 +75,7 @@ impl Bot {
 
 impl ChessBot for Bot {
     fn get_best_move(&mut self, board: &mut Board) -> Move {
-        self.search(board, DEPTH);
+        self.search(board, DEPTH, -99999999, 99999999);
 
         println!("Node count: {}", self.node_count);
         self.node_count = 0;
@@ -84,32 +85,44 @@ impl ChessBot for Bot {
 }
 
 impl Bot {
-    fn search(&mut self, board: &mut Board, depth: i32) -> i64 {
+    fn search(&mut self, board: &mut Board, depth: i32, alpha: i64, beta: i64) -> i64 {
+        if DEPTH != depth {
+            match board.get_game_result_simplified() {
+                0 => { return 0; }
+                1 => { return (DEPTH - depth) as i64 - 9999999; }
+                2 => { return (DEPTH - depth) as i64 - 9999999; }
+                _ => {}
+            }
+        }
+
         if depth == 0 {
             return self.evaluate(board);
         }
 
-        match board.get_game_result_simplified() {
-            0 => { return 0; }
-            1 => { return -9999999999; }
-            2 => { return -9999999999; }
-            _ => {}
-        }
-
         let moves = board.get_legal_moves().clone().unwrap();
-        let mut best_value = -99999999;
+        let mut best_value = alpha;
         let mut best_move: Move = moves[0];
 
         for m in moves {
-            board.make_move(m, true);
-
-            let value: i64 = -self.search(board, depth - 1);
+            let mut value: i64 = 0;
+            if !board.make_move(m, true) {
+                error!("Failed to make move {} in position {}", m.to_string(), board.generate_fen());
+            }
+            else {
+                value = -self.search(board, depth - 1, -beta, -best_value);
+            }
 
             board.undo_move(true).expect("Failed to undo move");
 
             if value > best_value {
                 best_value = value;
                 best_move = m;
+
+                if DEPTH != depth {
+                    if value >= beta {
+                        return beta;
+                    }
+                }
             }
         }
 
