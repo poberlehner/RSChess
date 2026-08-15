@@ -1,3 +1,5 @@
+use log::warn;
+
 use crate::board::piece::PieceType;
 use crate::board::r#move::{DIR_INDEX_TO_OFFSET, KNIGHT_JUMP_OFFSETS, Move};
 use crate::board::Board;
@@ -60,173 +62,6 @@ impl Board {
 
             self.black_attacked_squares_bitboard.unwrap()
         }
-
-        // let mut bitboard: i64 = 0;
-        //
-        // for y in 0i32..8 {
-        //     for x in 0i32..8 {
-        //         if self.squares[x as usize][y as usize].is_none() {
-        //             continue;
-        //         }
-        //
-        //         if self.squares[x as usize][y as usize].unwrap().white_piece != white {
-        //             continue;
-        //         }
-        //
-        //         match self.squares[x as usize][y as usize].unwrap().piece_type {
-        //             PieceType::King => {
-        //                 for i in (-1i32 + (x == 0) as i32)..(2 - (x == 7) as i32) {
-        //                     for j in (-1i32 + (y == 0) as i32)..(2 - (y == 7) as i32) {
-        //                         if i != 0 || j != 0 {
-        //                             bitboard = bitboard | 1 << Self::index_from_coord(((x + i) as u8, (y + j) as u8));
-        //                         }
-        //                     }
-        //                 }
-        //             }
-        //             PieceType::Pawn => {
-        //                 if y == 0 || y == 7 {
-        //                     continue;
-        //                 }
-        //
-        //                 let row_in_front = y as usize - white as usize + !white as usize;
-        //
-        //                 if x != 7 {
-        //                     bitboard = bitboard | 1 << Self::index_from_coord((x as u8 + 1, row_in_front as u8));
-        //                 }
-        //                 if x != 0 {
-        //                     bitboard = bitboard | 1 << Self::index_from_coord((x as u8 - 1, row_in_front as u8));
-        //                 }
-        //             }
-        //             PieceType::Queen => {
-        //                 for direction in [(0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (-1, 1), (1, -1), (-1, -1)] {
-        //                     let mut check_offset = (0, 0);
-        //                     let mut obstructed: bool = false;
-        //
-        //                     if check_offset.0 + direction.0 + x < 0 || check_offset.0 + direction.0 + x > 7 {
-        //                         obstructed = true;
-        //                     }
-        //                     if check_offset.1 + direction.1 + y < 0 || check_offset.1 + direction.1 + y > 7 {
-        //                         obstructed = true;
-        //                     }
-        //
-        //                     while !obstructed {
-        //                         check_offset.0 += direction.0;
-        //                         check_offset.1 += direction.1;
-        //
-        //                         if self.squares[(x + check_offset.0) as usize][(y + check_offset.1) as usize].is_none() {
-        //                             bitboard = bitboard | 1 << Self::index_from_coord(((x + check_offset.0) as u8, (y + check_offset.1) as u8));
-        //                         }
-        //                         else {
-        //                             bitboard = bitboard | 1 << Self::index_from_coord(((x + check_offset.0) as u8, (y + check_offset.1) as u8));
-        //
-        //                             //don't break when the enemy king is blocking to prevent him from moving back
-        //                             if !square_contains!(self, x + check_offset.0, y + check_offset.1, !white, PieceType::King) {
-        //                                 break;
-        //                             }
-        //                         }
-        //
-        //                         if x + check_offset.0 == 7 && direction.0 == 1 { break; }
-        //                         if x + check_offset.0 == 0 && direction.0 == -1 { break; }
-        //                         if y + check_offset.1 == 7 && direction.1 == 1 { break; }
-        //                         if y + check_offset.1 == 0 && direction.1 == -1 { break; }
-        //                     }
-        //                 }
-        //             }
-        //             PieceType::Rook => {
-        //                 for direction in [(0, 1), (0, -1), (1, 0), (-1, 0)] {
-        //                     let mut check_offset = (0, 0);
-        //                     let mut obstructed: bool = false;
-        //
-        //                     if check_offset.0 + direction.0 + x < 0 || check_offset.0 + direction.0 + x > 7 {
-        //                         obstructed = true;
-        //                     }
-        //                     if check_offset.1 + direction.1 + y < 0 || check_offset.1 + direction.1 + y > 7 {
-        //                         obstructed = true;
-        //                     }
-        //
-        //                     while !obstructed {
-        //                         check_offset.0 += direction.0;
-        //                         check_offset.1 += direction.1;
-        //
-        //                         if self.squares[(x + check_offset.0) as usize][(y + check_offset.1) as usize].is_none() {
-        //                             bitboard = bitboard | 1 << Self::index_from_coord(((x + check_offset.0) as u8, (y + check_offset.1) as u8));
-        //                         }
-        //                         else {
-        //                             bitboard = bitboard | 1 << Self::index_from_coord(((x + check_offset.0) as u8, (y + check_offset.1) as u8));
-        //
-        //                             //don't break when the enemy king is blocking to prevent him from moving back
-        //                             if !square_contains!(self, x + check_offset.0, y + check_offset.1, !white, PieceType::King) {
-        //                                 break;
-        //                             }
-        //                         }
-        //
-        //                         if x + check_offset.0 == 7 && direction.0 == 1 { break; }
-        //                         if x + check_offset.0 == 0 && direction.0 == -1 { break; }
-        //                         if y + check_offset.1 == 7 && direction.1 == 1 { break; }
-        //                         if y + check_offset.1 == 0 && direction.1 == -1 { break; }
-        //                     }
-        //                 }
-        //             }
-        //             PieceType::Bishop => {
-        //                 for direction in [(1, 1), (-1, 1), (1, -1), (-1, -1)] {
-        //                     let mut check_offset = (0, 0);
-        //                     let mut obstructed: bool = false;
-        //
-        //                     if check_offset.0 + direction.0 + x < 0 || check_offset.0 + direction.0 + x > 7 {
-        //                         obstructed = true;
-        //                     }
-        //                     if check_offset.1 + direction.1 + y < 0 || check_offset.1 + direction.1 + y > 7 {
-        //                         obstructed = true;
-        //                     }
-        //
-        //                     while !obstructed {
-        //                         check_offset.0 += direction.0;
-        //                         check_offset.1 += direction.1;
-        //
-        //                         if self.squares[(x + check_offset.0) as usize][(y + check_offset.1) as usize].is_none() {
-        //                             bitboard = bitboard | 1 << Self::index_from_coord(((x + check_offset.0) as u8, (y + check_offset.1) as u8));
-        //                         } else {
-        //                             bitboard = bitboard | 1 << Self::index_from_coord(((x + check_offset.0) as u8, (y + check_offset.1) as u8));
-        //
-        //                             //don't break when the enemy king is the blocking piece to prevent him from moving back (makes it easier for eval algorithms to evaluate skewers correctly too)
-        //                             if !square_contains!(self, x + check_offset.0, y + check_offset.1, !white, PieceType::King) {
-        //                                 break;
-        //                             }
-        //                         }
-        //
-        //                         if x + check_offset.0 == 7 && direction.0 == 1 { break; }
-        //                         if x + check_offset.0 == 0 && direction.0 == -1 { break; }
-        //                         if y + check_offset.1 == 7 && direction.1 == 1 { break; }
-        //                         if y + check_offset.1 == 0 && direction.1 == -1 { break; }
-        //                     }
-        //                 }
-        //             }
-        //             PieceType::Knight => {
-        //                 for i in [-2i32, -1, 1, 2] {
-        //                     for j in [-2i32, -1, 1, 2] {
-        //                         if i.abs() != j.abs() {
-        //                             if x + i <= 7 && x + i >= 0 && y + j <= 7 && y + j >= 0 {
-        //                                 bitboard = bitboard | 1 << Self::index_from_coord(((x + i) as u8, (y + j) as u8));
-        //                             }
-        //                         }
-        //                     }
-        //                 }
-        //             }
-        //             _ => {
-        //                 eprintln!("Piece on square ({}, {}) set to None", x,y);
-        //             }
-        //         }
-        //     }
-        // }
-        //
-        // if white {
-        //     self.white_attacked_squares_bitboard = Some(bitboard);
-        // }
-        // else {
-        //     self.black_attacked_squares_bitboard = Some(bitboard);
-        // }
-        //
-        // bitboard
     }
 
     #[inline(always)]
@@ -244,81 +79,6 @@ impl Board {
 
             self.black_orthogonal_pin_bitboard.unwrap()
         }
-
-        // let mut king_square: (i8, i8) = (11, 11);
-        //
-        // for x in 0..8 {
-        //     for y in 0..8 {
-        //         if self.squares[iu].is_some() && self.squares[iu].unwrap().piece_type == PieceType::King && self.squares[iu].unwrap().white_piece == white {
-        //             king_square = (x as i8, y as i8);
-        //         }
-        //     }
-        // }
-        //
-        // if king_square.0 == 11 || king_square.1 == 11 {
-        //     println!("Unable to find king square!");
-        // }
-        //
-        // let mut bitboard = 0;
-        //
-        // for direction in [(0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (-1, 1), (1, -1), (-1, -1)] {
-        //     let mut potential_bitboard: i64 = 0;
-        //     let mut check_offset = direction;
-        //     let mut potential_pin = false;
-        //
-        //     loop {
-        //         if  (king_square.0 + check_offset.0) > 7 || (king_square.1 + check_offset.1) > 7 ||
-        //             (king_square.0 + check_offset.0) < 0 || (king_square.1 + check_offset.1) < 0 {
-        //             break;
-        //         }
-        //
-        //         if check_offset.0 != 0 && check_offset.1 != 0 {
-        //             potential_bitboard |= 1 << Self::index_from_coord(((king_square.0 + check_offset.0) as u8, (king_square.1 + check_offset.1) as u8));
-        //         }
-        //
-        //         if self.squares[(check_offset.0 + king_square.0) as usize][(check_offset.1 + king_square.1) as usize].is_some() {
-        //             if potential_pin {
-        //                 //break, if another piece of the kings color comes after
-        //                 if self.squares[(check_offset.0 + king_square.0) as usize][(check_offset.1 + king_square.1) as usize].unwrap().white_piece == white {
-        //                     break;
-        //                 }
-        //
-        //                 //the piece has to be a diagonally sliding piece to pin
-        //                 if direction.0 != 0 && direction.1 != 0 {
-        //                     if  self.squares[(check_offset.0 + king_square.0) as usize][(check_offset.1 + king_square.1) as usize].unwrap().piece_type == PieceType::Bishop ||
-        //                         self.squares[(check_offset.0 + king_square.0) as usize][(check_offset.1 + king_square.1) as usize].unwrap().piece_type == PieceType::Queen {
-        //                         bitboard |= potential_bitboard;
-        //                     }
-        //                 }
-        //                 //the piece has to be laterally sliding
-        //                 else {
-        //                     if  self.squares[(check_offset.0 + king_square.0) as usize][(check_offset.1 + king_square.1) as usize].unwrap().piece_type == PieceType::Rook ||
-        //                         self.squares[(check_offset.0 + king_square.0) as usize][(check_offset.1 + king_square.1) as usize].unwrap().piece_type == PieceType::Queen {
-        //                         bitboard |= potential_bitboard;
-        //                     }
-        //                 }
-        //             }
-        //             else {
-        //                 if self.squares[(king_square.0 + check_offset.0) as usize][(king_square.1 + check_offset.1) as usize].unwrap().white_piece == white {
-        //                     potential_pin = true;
-        //                 }
-        //             }
-        //         }
-        //
-        //
-        //         check_offset.0 += direction.0;
-        //         check_offset.1 += direction.1;
-        //     }
-        // }
-        //
-        // if white {
-        //     self.white_pin_king_bitboard = Some(bitboard);
-        // }
-        // else {
-        //     self.black_pin_king_bitboard = Some(bitboard);
-        // }
-        //
-        // bitboard
     }
 
     #[inline(always)]
@@ -357,70 +117,6 @@ impl Board {
 
             self.black_check_block_bitboard.unwrap()
         }
-
-        // let king_square = if white { self.white_king_pos } else { self.black_king_pos };
-        // let king_square = (king_square.0 as i8, king_square.1 as i8);
-        //
-        // let mut bitboard: i64 = 0;
-        //
-        // for direction in [(0, 1), (0, -1), (1, 0), (-1, 0), (-1, 1), (-1, -1), (1, -1), (1, 1)] {
-        //     let mut check_offset = direction;
-        //     let mut potential_bitboard: i64 = 1 << Self::index_from_coord((king_square.0 as u8, king_square.1 as u8));
-        //
-        //     loop {
-        //         if ((check_offset.0 + king_square.0) < 0) || ((check_offset.1 + king_square.1) < 0) {
-        //             break;
-        //         }
-        //         if ((check_offset.0 + king_square.0) > 7) || ((check_offset.1 + king_square.1) > 7) {
-        //             break;
-        //         }
-        //
-        //         potential_bitboard |= 1 << Self::index_from_coord(((king_square.0 + check_offset.0) as u8, (king_square.1 + check_offset.1) as u8));
-        //
-        //         if  self.squares[(king_square.0 + check_offset.0) as usize][(king_square.1 + check_offset.1) as usize].is_some() ||
-        //             square_contains!(self, (king_square.0 + check_offset.0), king_square.1 + check_offset.1, white, PieceType::King) {
-        //             if direction.0 != 0 && direction.1 != 0 {
-        //                 if square_contains!(self, king_square.0 + check_offset.0, king_square.1 + check_offset.1, !white, PieceType::Bishop) || square_contains!(self, king_square.0 + check_offset.0, king_square.1 + check_offset.1, !white, PieceType::Queen) {
-        //                     bitboard |= potential_bitboard;
-        //                 }
-        //                 if square_contains!(self, king_square.0 + check_offset.0, king_square.1 + check_offset.1, !white, PieceType::Pawn) && (check_offset.0.abs() == 1 && check_offset.1.abs() == 1) {
-        //                     bitboard |= potential_bitboard;
-        //                 }
-        //             }
-        //             else {
-        //                 if square_contains!(self, king_square.0 + check_offset.0, king_square.1 + check_offset.1, !white, PieceType::Rook)  || square_contains!(self, king_square.0 + check_offset.0, king_square.1 + check_offset.1, !white, PieceType::Queen) {
-        //                     bitboard |= potential_bitboard;
-        //                 }
-        //             }
-        //
-        //             break;
-        //         }
-        //
-        //         check_offset.0 += direction.0;
-        //         check_offset.1 += direction.1;
-        //     }
-        // }
-        //
-        // for offset in [(-1, -2), (-2, -1), (-2, 1), (-1, 2), (1, -2), (1, 2), (2, -1), (2, 1)] {
-        //     if  offset.0 + king_square.0 < 0 || offset.1 + king_square.1 < 0 ||
-        //         offset.0 + king_square.0 > 7 || offset.1 + king_square.1 > 7 {
-        //         continue;
-        //     }
-        //
-        //     if square_contains!(self, offset.0 + king_square.0, offset.1 + king_square.1, !white, PieceType::Knight) {
-        //         bitboard |= 1 << Self::index_from_coord((king_square.0 as u8, king_square.1 as u8));
-        //         bitboard |= 1 << Self::index_from_coord(((offset.0 + king_square.0) as u8, (offset.1 + king_square.1) as u8));
-        //     }
-        // }
-        //
-        // if white {
-        //     self.white_check_block_bitboard = Some(bitboard);
-        // }
-        // else {
-        //     self.black_check_block_bitboard = Some(bitboard);
-        // }
-        //
-        // bitboard
     }
 
     #[inline(always)]
@@ -430,13 +126,13 @@ impl Board {
                 self.generate_all_bitboards();
             }
 
-            self.white_en_passant_pin_bitboard.expect("generate_all_bitboards didn't generate white_en_passant_pin_bitboard")
+            self.white_en_passant_pin_bitboard.unwrap()
         } else {
             if self.black_en_passant_pin_bitboard.is_none() {
                 self.generate_all_bitboards();
             }
 
-            self.black_en_passant_pin_bitboard.expect("generate_all_bitboards didn't generate black_en_passant_pin_bitboard")
+            self.black_en_passant_pin_bitboard.unwrap()
         }
     }
 
@@ -966,7 +662,8 @@ impl Board {
                         }
                     }
                     _ => {
-                        eprintln!("Piece on square ({}, {}) set to None", i % 8, i / 8);
+                        eprintln!("PieceType on square ({}, {}) set to None", i % 8, i / 8);
+                        warn!("PieceType on square {i} set to None");
                     }
                 }
             }
