@@ -6,8 +6,6 @@ use chess_engine::board::{
 };
 use chrono::prelude::*;
 use log::*;
-use rand::SeedableRng;
-use rand::rngs::StdRng;
 use raylib::core::RaylibHandle;
 use raylib::ffi::{GetRandomValue, GuiControl::DEFAULT, GuiDefaultProperty::TEXT_SIZE};
 use raylib::prelude::*;
@@ -20,7 +18,6 @@ use std::{
     panic::PanicHookInfo,
     path::PathBuf,
     thread::{JoinHandle, spawn},
-    sync::{Arc, Mutex},
     time::Instant
 };
 use chess_engine::board::Board;
@@ -47,9 +44,6 @@ pub struct BotController {
     raylib_thread: RaylibThread,
 
     frame_times: Vec<f32>,
-
-    ///Only for the bot as the bot_thread keeps it locked for it's entire runtime
-    bot_rng: Arc<Mutex<StdRng>>,
 
     board: Board,
     renderer: Renderer,
@@ -101,8 +95,6 @@ impl BotController {
 
             frame_times: vec![],
 
-            bot_rng: Arc::new(Mutex::new(StdRng::seed_from_u64(15))),
-
             board,
             renderer,
 
@@ -152,10 +144,8 @@ impl BotController {
             if !allow_moving && self.board.get_game_result() == GameResult::InProgress && self.bot_thread.is_none() {
                 let mut bot_board = self.board.clone();
                 let mut bot_copy = self.bot.clone();
-                let rng_copy = self.bot_rng.clone();
                 self.bot_thread = Some(spawn(move || -> Move {
-                    //Constantly locking self.rng is not ideal because it will lead to lagging if it is used outside while this thread is running
-                    bot_copy.get_best_move(&mut bot_board, &mut rng_copy.lock().unwrap())
+                    bot_copy.get_best_move(&mut bot_board)
                 }));
             }
 
@@ -194,10 +184,8 @@ impl BotController {
             if self.board.get_game_result() == GameResult::InProgress && self.bot_thread.is_none() {
                 let mut bot_board = self.board.clone();
                 let mut bot_copy = self.bot.clone();
-                let rng_copy = self.bot_rng.clone();
                 self.bot_thread = Some(spawn(move || -> Move {
-                    //Constantly locking self.rng is not ideal because it will lead to lagging if it is used outside while this thread is running
-                    bot_copy.get_best_move(&mut bot_board, &mut rng_copy.lock().unwrap())
+                    bot_copy.get_best_move(&mut bot_board)
                 }));
             }
 
