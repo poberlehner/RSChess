@@ -17,7 +17,7 @@ impl Board {
             (self.game_result == GameResult::Repetition || self.game_result == GameResult::FiftyMoveRule)) {
             println!("The game is not running");
             println!("Game Result: {:?}", self.game_result);
-            warn!("Tried to make move {} in position \"{}\" while the game result is {:?}", m.to_string(), self.generate_fen(), self.game_result);
+            warn!("Tried to make move {m} in position \"{}\" while the game result is {:?}", self.generate_fen(), self.game_result);
 
             self.move_log.push(LogMove::null_move());
 
@@ -30,9 +30,9 @@ impl Board {
 
         if !self.legal_moves.as_ref().unwrap().contains(&m) {
             println!("Position: {}", self.generate_fen());
-            println!("The Move: {} is not legal", m.to_string());
+            println!("The Move: {m} is not legal");
 
-            warn!("Tried to make move {} in position \"{}\"", m.to_string(), self.generate_fen());
+            warn!("Tried to make move {m} in position \"{}\"", self.generate_fen());
 
             self.move_log.push(LogMove::null_move());
 
@@ -42,7 +42,7 @@ impl Board {
         if !in_search {
             if !self.handle_time() {
                 println!("No time left");
-                info!("Tried to make move {} after timeout", m.to_string());
+                info!("Tried to make move {m} after timeout");
 
                 self.move_log.push(LogMove::null_move());
 
@@ -102,13 +102,13 @@ impl Board {
             #[cfg(debug_assertions)]
             {
                 if m.promotion_type == PieceType::King {
-                    error!("Promotion type of move {} is set to king in position \"{}\"", m.to_string(), self.generate_fen());
+                    error!("Promotion type of move {m} is set to king in position \"{}\"", self.generate_fen());
                     panic!("Invalid promotion type");
                 }
                 if self.squares[m.origin_square as usize]
                     .unwrap().piece_type != PieceType::Pawn {
-                    error!("Promotion type of move {} is set even though the move originates from {:?}",
-                            m.to_string(), self.squares[m.origin_square as usize].unwrap().piece_type);
+                    error!("Promotion type of move {m} is set even though the move originates from {:?}",
+                            self.squares[m.origin_square as usize].unwrap().piece_type);
                     panic!("invalid promotion type");
                 }
             }
@@ -310,61 +310,55 @@ impl Board {
                             return Duration::new(0, 0);
                         }
 
-                        return self.white_time_left - self.move_start_time.elapsed();
+                        self.white_time_left - self.move_start_time.elapsed()
                     }
                     else {
-                        return self.white_time_left;
+                        self.white_time_left
                     }
                 }
                 else {
                     if self.game_state.white_to_move {
-                        return self.black_time_left;
+                        self.black_time_left
                     }
                     else {
                         if self.move_start_time.elapsed() > self.black_time_left {
                             return Duration::new(0, 0);
                         }
 
-                        return self.black_time_left - self.move_start_time.elapsed();
+                        self.black_time_left - self.move_start_time.elapsed()
                     }
                 }
             }
             TimeControl::Unlimited => {
-                return Duration::new(0, 0);
+                Duration::new(0, 0)
             }
         }
     }
 
     ///0 == Draw; 1 = White won; 2 = Black won; -1 = Game not finished
     pub fn get_game_result_simplified(&self) -> i32 {
-        return match self.game_result {
-            GameResult::BlackIsMated         => { 1 }
-            GameResult::BlackTimeout         => { 1 }
-            GameResult::WhiteIsMated         => { 2 }
-            GameResult::WhiteTimeout         => { 2 }
-            GameResult::InProgress           => {-1 }
-            GameResult::NotStarted           => {-1 }
-            GameResult::InsufficientMaterial => { 0 }
-            GameResult::FiftyMoveRule        => { 0 }
-            GameResult::Repetition           => { 0 }
-            GameResult::Stalemate            => { 0 }
+        match self.game_result {
+            GameResult::BlackIsMated | GameResult::BlackTimeout => { 1 }
+            GameResult::WhiteIsMated | GameResult::WhiteTimeout => { 2 }
+            GameResult::InProgress   | GameResult::NotStarted   => {-1 }
+            GameResult::InsufficientMaterial | GameResult::FiftyMoveRule |
+            GameResult::Repetition   | GameResult::Stalemate    => { 0 }
         }
     }
 
     pub fn get_move_history(&self) -> String {
         let mut result = "".to_string();
-        let mut number: i32 = 1;
 
         let mut board = Board::new();
         board.load_fen(&board.start_fen.clone());
         board.start_game(TimeControl::Unlimited);
 
-        for m in self.move_log.iter() {
+        for (number, m) in (1i32..).zip(self.move_log.iter()) {
             if number % 2 == 1 {
                 result.push_str(&format!("{}. ", (number as f32 / 2.0).ceil()));
             }
 
-            let move_str = board.log_move_to_string(m.clone());
+            let move_str = board.log_move_to_string(*m);
 
             board.make_move(m.to_move(), false);
 
@@ -379,8 +373,6 @@ impl Board {
             else {
                 result.push_str(&move_str);
             }
-
-            number += 1;
 
             result.push(' ');
         }
@@ -402,7 +394,7 @@ impl Board {
         let mut result = "".to_string();
 
         result.push_str("[Event \"");
-        result.push_str(&format!("{}", event.unwrap_or("-")));
+        result.push_str(event.unwrap_or("-"));
         result.push_str("\"]\n");
 
         result.push_str("[Site \"RSChess\"]\n");
@@ -446,10 +438,10 @@ impl Board {
     }
 
     pub fn save_game(&mut self, save_file: String, event: Option<&str>, competitors: Option<(&str, &str)>, round: Option<&str>) {
-        let pgn_file = std::fs::File::options().append(true).create(true).write(true).open(&save_file);
+        let pgn_file = std::fs::File::options().append(true).create(true).open(&save_file);
 
         if let Err(err) = pgn_file {
-            warn!("Failed to open pgn save file: \"{}\" due to {}", &save_file, err);
+            warn!("Failed to open pgn save file: \"{}\" due to {}", save_file, err);
             return;
         }
 
@@ -457,12 +449,12 @@ impl Board {
         let pgn = self.get_pgn(event, competitors, round);
 
         if let Err(err) = pgn_file.write(pgn.as_bytes()) {
-            error!("Failed to write to pgn save file \"{}\" due to {}", &save_file, err);
+            error!("Failed to write to pgn save file \"{}\" due to {}", save_file, err);
             return;
         }
 
         if let Err(err) = pgn_file.write("\n\n".as_bytes()) {
-            error!("Failed second write to pgn save file \"{}\" due to {}", &save_file, err);
+            error!("Failed second write to pgn save file \"{}\" due to {}", save_file, err);
         }
     }
 
@@ -646,7 +638,7 @@ impl Board {
         let mut eq_count = 0;
 
         for m_local in moves.clone().iter() {
-            let moved_piece = self.squares[m_local.origin_square as usize].clone().unwrap();
+            let moved_piece = self.squares[m_local.origin_square as usize].unwrap();
             if m_local.destination_square == m.destination_square {
 
                 if moved_piece == m.moved_piece {
@@ -728,7 +720,7 @@ impl Board {
 
         //Handle repetition
         {
-            self.zobrist_history.push(self.zobrist.generate_key(&self));
+            self.zobrist_history.push(self.zobrist.generate_key(self));
 
             let mut equals: i32 = 0;
             for i in 0..self.zobrist_history.len() - 1 {
@@ -780,14 +772,14 @@ impl Board {
         let mut knight_num: i32 = 0;
         let mut opp_pieces: i32 = 0;
 
-        for i in 0..64 {
-            if self.squares[i].is_some() {
-                if self.squares[i].unwrap().white_piece == white {
-                    if insufficient_piece == true {
+        for square in self.squares.iter() {
+            if square.is_some() {
+                if square.unwrap().white_piece == white {
+                    if insufficient_piece {
                         return false;
                     }
 
-                    match self.squares[i].unwrap().piece_type {
+                    match square.unwrap().piece_type {
                         PieceType::Bishop => { insufficient_piece = true; }
                         PieceType::Knight => {
                             knight_num += 1;
@@ -806,11 +798,7 @@ impl Board {
             }
         }
 
-        if knight_num == 2 && opp_pieces >= 2 {
-            return false;
-        }
-
-        true
+        !(knight_num == 2 && opp_pieces >= 2)
     }
 
     //Returns true if there is time left
@@ -845,7 +833,7 @@ impl Board {
                     self.black_time_left += increment;
                 }
 
-                return true;
+                true
             }
             _ => { true }
         }

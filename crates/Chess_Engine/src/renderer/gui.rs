@@ -66,8 +66,13 @@ impl Renderer {
         if self.promotion_popup.is_some() {
             let promotion_type = self.promotion_popup.unwrap().update(rl);
 
-            if promotion_type.is_some() {
-                self.promotion_move = Some(Move { origin_square: self.promotion_move.unwrap().origin_square, destination_square: self.promotion_move.unwrap().destination_square, promotion_type: promotion_type.unwrap()});
+            if let Some(promotion_type) = promotion_type {
+                self.promotion_move =
+                    Some( Move {
+                        origin_square: self.promotion_move.unwrap().origin_square,
+                        destination_square: self.promotion_move.unwrap().destination_square,
+                        promotion_type
+                    });
                 board.make_move(self.promotion_move.unwrap(), false);
 
                 self.promotion_popup = None;
@@ -82,7 +87,7 @@ impl Renderer {
         }
 
         if self.selected_square.is_some() && !self.active_selection {
-            let square: u8 = self.mouse_pos_to_square_index_rl(&rl) as u8;
+            let square: u8 = self.mouse_pos_to_square_index_rl(rl) as u8;
             let moves = board.get_legal_moves_for_square(self.selected_square.unwrap());
             let current_move = Move { origin_square: self.selected_square.unwrap(), destination_square: square, promotion_type: PieceType::None };
 
@@ -93,7 +98,7 @@ impl Renderer {
             }
             else {
                 self.selected_square = Some(
-                    self.mouse_pos_to_square_index_rl(&rl) as u8
+                    self.mouse_pos_to_square_index_rl(rl) as u8
                 );
 
                 self.active_selection = true;
@@ -101,7 +106,7 @@ impl Renderer {
         }
         else {
             self.selected_square = Some(
-                self.mouse_pos_to_square_index_rl(&rl) as u8
+                self.mouse_pos_to_square_index_rl(rl) as u8
             );
 
             self.active_selection = true;
@@ -109,7 +114,7 @@ impl Renderer {
     }
 
     fn handle_mouse_button_release(&mut self, board: &mut Board, rl: &mut RaylibDrawHandle) {
-        let square: u8 = self.mouse_pos_to_square_index_rl(&rl) as u8;
+        let square: u8 = self.mouse_pos_to_square_index_rl(rl) as u8;
 
         if self.selected_square.is_none() {
             return;
@@ -127,7 +132,7 @@ impl Renderer {
             //Promotion handling
             current_move.promotion_type = PieceType::Queen;
             if moves.contains(&current_move) {
-                let position = self.square_index_to_pos_rl(&rl, current_move.origin_square as i32);
+                let position = self.square_index_to_pos_rl(rl, current_move.origin_square as i32);
 
                 self.promotion_popup = Some(PromotionPopup::new(
                     position,
@@ -171,11 +176,11 @@ impl Renderer {
         // }
 
         if self.board_flip {
-            result.x = ((draw_handle.get_screen_width() - self.square_size as i32 * 8) + (7 - i % 8) as i32 * self.square_size as i32) as f32;
+            result.x = ((draw_handle.get_screen_width() - self.square_size as i32 * 8) + (7 - i % 8) * self.square_size as i32) as f32;
             result.y = (self.square_size * 7 - (7 - i as u32 / 8) * self.square_size) as f32;
         }
         else {
-            result.x = ((draw_handle.get_screen_width() - self.square_size as i32 * 8) + (i % 8) as i32 * self.square_size as i32) as f32;
+            result.x = ((draw_handle.get_screen_width() - self.square_size as i32 * 8) + (i % 8) * self.square_size as i32) as f32;
             result.y = (self.square_size * 7 - i as u32 / 8 * self.square_size) as f32;
         }
 
@@ -186,11 +191,11 @@ impl Renderer {
         let mut result: Vector2 = Vector2::zero();
 
         if self.board_flip {
-            result.x = ((rl.get_screen_width() - self.square_size as i32 * 8) + (7 - i % 8) as i32 * self.square_size as i32) as f32;
+            result.x = ((rl.get_screen_width() - self.square_size as i32 * 8) + (7 - i % 8) * self.square_size as i32) as f32;
             result.y = (self.square_size * 7 - (7 - i as u32 / 8) * self.square_size) as f32;
         }
         else {
-            result.x = ((rl.get_screen_width() - self.square_size as i32 * 8) + (i % 8) as i32 * self.square_size as i32) as f32;
+            result.x = ((rl.get_screen_width() - self.square_size as i32 * 8) + (i % 8) * self.square_size as i32) as f32;
             result.y = (self.square_size * 7 - i as u32 / 8 * self.square_size) as f32;
         }
 

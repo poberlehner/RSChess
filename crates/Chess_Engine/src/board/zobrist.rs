@@ -20,18 +20,18 @@ impl Zobrist {
         let mut zobrist: Zobrist = Zobrist { square_nums: [[0; 15]; 64], castling_states_nums: [0; 16], en_passant: [0; 9], side_to_move: 0 };
         let mut rng: SmallRng = rand::make_rng();
 
-        for square_index in 0..64 {
-            for piece_index in 0..15 {
-                zobrist.square_nums[square_index][piece_index] = rng.random::<i64>();
+        for piece_nums in zobrist.square_nums.iter_mut() {
+            for num in piece_nums.iter_mut() {
+                *num = rng.random::<i64>();
             }
         }
 
-        for castling_state_index in 0..16 {
-            zobrist.castling_states_nums[castling_state_index] = rng.random::<i64>();
+        for castling_state in zobrist.castling_states_nums.iter_mut() {
+            *castling_state = rng.random::<i64>();
         }
 
-        for en_passant_index in 0..9 {
-            zobrist.en_passant[en_passant_index] = rng.random::<i64>();
+        for en_passant_file in zobrist.en_passant.iter_mut() {
+            *en_passant_file = rng.random::<i64>();
         }
 
         zobrist.side_to_move = rng.random::<i64>();
@@ -48,16 +48,16 @@ impl Zobrist {
         for i in 0..64 {
             let piece = board.squares[i];
 
-            if piece.is_some() {
-                key ^= self.square_nums[i][piece.unwrap().as_num()];
+            if let Some(piece) = piece {
+                key ^= self.square_nums[i][piece.as_num()];
             }
         }
 
-        if board.game_state.en_passant_square.is_none() {
-            key ^= self.en_passant[0];
+        if let Some(en_passant_square) = board.game_state.en_passant_square {
+            key ^= self.en_passant[(en_passant_square % 8 + 1) as usize];
         }
         else {
-            key ^= self.en_passant[(board.game_state.en_passant_square.unwrap() % 8 + 1) as usize];
+            key ^= self.en_passant[0];
         }
 
         if board.game_state.white_to_move {
@@ -68,5 +68,11 @@ impl Zobrist {
         key ^= self.castling_states_nums[castle[0] as usize + 2 * castle[1] as usize + 4 * castle[2] as usize + 8 * castle[3] as usize];
 
         key
+    }
+}
+
+impl Default for Zobrist {
+    fn default() -> Self {
+        Self::new()
     }
 }

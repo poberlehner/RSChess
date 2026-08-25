@@ -5,7 +5,7 @@ use log::*;
 use uci_engine::UCIController;
 
 fn main() {
-    let mut log_file = File::options().append(true).create(true).write(true).open("assets/Chess.log").expect("Failed to open log file");
+    let mut log_file = File::options().append(true).create(true).open("assets/Chess.log").expect("Failed to open log file");
     if let Err(e) = log_file.write("\n".as_bytes()) {
         eprintln!("Failed to write to log file \"assets/Chess.log\" with error {e}");
     }
@@ -14,7 +14,11 @@ fn main() {
     let mut arguments: Vec<String> = std::env::args().collect();
     arguments.remove(0);
 
-    if arguments.len() >= 1 {
+    if arguments.is_empty() {
+        let mut uci = UCIController::new();
+        uci.run();
+    }
+    else {
         match arguments[0].as_str() {
             "gui" => {
                 let mut app: BotController = BotController::new();
@@ -51,10 +55,6 @@ fn main() {
                 error!("Invalid command line argument: {}", arguments[0]);
             }
         }
-    }
-    else {
-        let mut uci = UCIController::new();
-        uci.run();
     }
 }
 

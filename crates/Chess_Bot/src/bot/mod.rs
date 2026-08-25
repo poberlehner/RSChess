@@ -106,7 +106,7 @@ impl Bot {
         for m in moves {
             let mut value: i64 = 0;
             if !board.make_move(m, true) {
-                error!("Failed to make move {} in position {}", m.to_string(), board.generate_fen());
+                error!("Failed to make move {m} in position {}", board.generate_fen());
             }
             else {
                 value = -self.search(board, depth - 1, -beta, -best_value);
@@ -118,16 +118,14 @@ impl Bot {
                 best_value = value;
                 best_move = m;
 
-                if DEPTH != depth {
-                    if value >= beta {
-                        return beta;
-                    }
+                if DEPTH != depth && value >= beta {
+                    return beta;
                 }
             }
         }
 
         if DEPTH == depth {
-            println!("Best move: {}, value: {best_value}", self.best_move.to_string());
+            println!("Best move: {}, value: {best_value}", self.best_move);
         }
 
         self.best_move = best_move;
@@ -143,12 +141,12 @@ impl Bot {
 
         self.node_count += 1;
 
-        for i in 0..64 {
-            if squares[i].is_none() {
+        for (i, square) in squares.iter().enumerate() {
+            if square.is_none() {
                 continue;
             }
 
-            let p = squares[i].unwrap();
+            let p = square.unwrap();
             let i_corr = if board.get_white_to_move() { i } else { 64 - i - 1 };
 
             let piece_val = PIECE_SQUARE_TABLES[p.piece_type as usize - 1][i_corr] + PIECE_VALUES[p.piece_type as usize - 1];
@@ -164,5 +162,11 @@ impl Bot {
         }
 
         value
+    }
+}
+
+impl Default for Bot {
+    fn default() -> Self {
+        Self::new()
     }
 }

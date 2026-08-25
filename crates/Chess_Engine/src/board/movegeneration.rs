@@ -5,6 +5,7 @@ use crate::board::piece::PieceType;
 
 impl Board {
     #[inline(always)]
+    #[allow(clippy::too_many_arguments)]
     fn add_move(&mut self, origin: u8, target: u8, promotion_type: PieceType, white: bool,
         pinned_orthogonal: bool, pinned_diagonal: bool, check: bool, moves: &mut Vec<Move>) {
         if check {
@@ -25,18 +26,16 @@ impl Board {
 
         if pinned_orthogonal {
             //Only allow orthogonal movement
-            if ((origin % 8).abs_diff(target % 8) != 0) ^ ((origin / 8).abs_diff(target / 8) != 0) {
-                if 1 << target & self.get_orthogonal_pin_bitboard(white) != 0 {
-                    moves.push(Move { origin_square: origin, destination_square: target, promotion_type });
-                }
+            if (((origin % 8).abs_diff(target % 8) != 0) ^ ((origin / 8).abs_diff(target / 8) != 0)) &&
+                (1 << target & self.get_orthogonal_pin_bitboard(white) != 0) {
+                moves.push(Move { origin_square: origin, destination_square: target, promotion_type });
             }
         }
         else if pinned_diagonal {
             //Only allow diagonal movement
-            if ((origin % 8).abs_diff(target % 8) != 0) & ((origin / 8).abs_diff(target / 8) != 0) {
-                if 1 << target & self.get_diagonal_pin_bitboard(white) != 0 {
-                    moves.push( Move { origin_square: origin, destination_square: target, promotion_type });
-                }
+            if ((origin % 8).abs_diff(target % 8) != 0) & ((origin / 8).abs_diff(target / 8) != 0) &&
+                1 << target & self.get_diagonal_pin_bitboard(white) != 0 {
+                moves.push( Move { origin_square: origin, destination_square: target, promotion_type });
             }
         }
         else {
@@ -51,16 +50,14 @@ impl Board {
 
         let white = self.game_state.white_to_move;
 
-        let mut moves: Vec<Move> = vec![];
-        moves.reserve(30);
-        let check: bool;
+        let mut moves: Vec<Move> = Vec::with_capacity(30);
 
+        let check: bool =
         if white {
-            check = 1 << self.white_king_pos & self.get_attacked_squares_bitboard(false) != 0;
-        }
-        else {
-            check = 1 << self.black_king_pos & self.get_attacked_squares_bitboard(true) != 0;
-        }
+             1 << self.white_king_pos & self.get_attacked_squares_bitboard(false) != 0
+        } else {
+            1 << self.black_king_pos & self.get_attacked_squares_bitboard(true) != 0
+        };
 
         for i in 0..64 {
             if self.squares[i].is_some() {
@@ -321,7 +318,7 @@ impl Board {
 
         for m in self.get_legal_moves().as_ref().unwrap().iter() {
             if m.origin_square == square {
-                moves.push(m.clone());
+                moves.push(*m);
             }
         }
 

@@ -1,4 +1,5 @@
 use std::io::{self, Write, stdin, stdout};
+use std::str::FromStr;
 use std::thread::JoinHandle;
 use chess_engine::board::{Board, STARTFEN, r#move::Move, utilities::TimeControl};
 use chess_bot::bot::Bot;
@@ -29,7 +30,7 @@ impl UCIController {
         let mut result: Result<usize, io::Error>;
 
 
-        while command != String::from("quit") {
+        while command != "quit" {
             print!("> ");
             let r = stdout().flush();
             if let Err(e) = r {
@@ -74,7 +75,7 @@ impl UCIController {
         }
     }
 
-    fn process_position_cmd(&mut self, commands: &mut Vec<&str>) {
+    fn process_position_cmd(&mut self, commands: &mut [&str]) {
         //TODO: Test
         let mut move_index = 2;
         if commands[1] == "fen" {
@@ -99,20 +100,30 @@ impl UCIController {
         self.board.start_game(TimeControl::Unlimited);
 
         while move_index < commands.len() {
-            self.board.make_move(Move::from_str(commands[move_index]), false);
+
+            self.board.make_move(Move::from_str(commands[move_index]).expect(""), false);
             move_index += 1;
         }
     }
 
     #[allow(unused)]
-    fn process_go_cmd(&mut self, commands: &mut Vec<&str>) {
+    fn process_go_cmd(&mut self, commands: &mut [&str]) {
         todo!();
 
         match commands[1] {
             "infinite" => {
-
+                
+            }
+            "depth" => {
+                
             }
             _ => {}
         }
+    }
+}
+
+impl Default for UCIController {
+    fn default() -> Self {
+        Self::new()
     }
 }

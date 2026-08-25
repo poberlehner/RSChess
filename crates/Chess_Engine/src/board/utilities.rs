@@ -61,10 +61,7 @@ impl Board {
 
     #[inline(always)]
     pub fn valid_file_char(c: char) -> bool {
-        match c {
-            '0'..='9' => { true }
-            _ => { false }
-        }
+        c.is_ascii_digit()
     }
 
     #[inline(always)]
@@ -161,12 +158,7 @@ impl Board {
         if ((1 << king_pos) & attack_bitboard) != 0 {
             let moves = self.get_legal_moves().as_ref().expect("Failed to get legal moves");
 
-            if moves.len() == 0 {
-                return true;
-            }
-            else {
-                return false;
-            }
+            return moves.is_empty();
         }
 
         false
@@ -177,11 +169,7 @@ impl Board {
 
         let attack_bitboard = self.get_attacked_squares_bitboard(!self.game_state.white_to_move);
 
-        if (attack_bitboard & (1 << king_pos)) != 0 {
-            return true
-        }
-
-        false
+        (attack_bitboard & (1 << king_pos)) != 0
     }
 
     pub fn load_fen(&mut self, fen: &str) {
@@ -399,13 +387,13 @@ impl Board {
 
         fen.push(' ');
 
-        if self.game_state.en_passant_square.is_some() {
-            if self.game_state.en_passant_square.unwrap() % 8 >= 8 {
+        if let Some(en_passant_square) = self.game_state.en_passant_square {
+            if en_passant_square % 8 >= 8 {
                 warn!("Invalid en passant square");
             }
             else {
-                fen.push(Self::column_index_to_char((self.game_state.en_passant_square.unwrap() % 8) as i32));
-                fen.push((self.game_state.en_passant_square.unwrap() / 8).to_string().pop().unwrap());
+                fen.push(Self::column_index_to_char((en_passant_square % 8) as i32));
+                fen.push((en_passant_square / 8).to_string().pop().unwrap());
             }
         }
         else {

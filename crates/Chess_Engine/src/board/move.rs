@@ -1,4 +1,6 @@
 use log::*;
+use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 use std::time::Duration;
 use crate::board::Board;
 use crate::board::piece::{Piece, PieceType};
@@ -45,10 +47,10 @@ pub struct LogMove {
     pub null_move: bool
 }
 
-impl Move {
+impl Display for Move {
     ///Returns the move name in UCI format
     /// Example: "e7e8q"
-    pub fn to_string(&self) -> String {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> std::fmt::Result {
         let mut string: String = String::from("");
 
         string.push_str(Board::square_index_to_string(self.origin_square).as_str());
@@ -63,17 +65,20 @@ impl Move {
             })
         }
 
-        string
+        fmt.write_str(&string)
     }
+}
 
+impl FromStr for Move {
     ///string must be in the UCI format
-    pub fn from_str(string: &str) -> Move {
+    fn from_str(string: &str) -> Result<Move, Self::Err> {
         let mut m = Move { origin_square: 0, destination_square: 0, promotion_type: PieceType::None };
 
         let chars = string.chars().collect::<Vec<char>>();
 
         if !Board::valid_file_char(chars[0]) || !Board::valid_file_char(chars[2]) {
-            warn!("Invalid file char in move string \"{string}\"")
+            warn!("Invalid file char in move string \"{string}\"");
+            return Err(())
         }
 
         m.origin_square = Board::file_char_to_index(chars[0]) as u8 + (chars[1].to_digit(10).unwrap_or(0) - 1) as u8 * 8;
@@ -84,16 +89,18 @@ impl Move {
 
         if m.origin_square >= 8 || m.destination_square >= 8 {
             error!("Invalid input to Move::from_str: {}", string);
-            return Move { origin_square: 0, destination_square: 0, promotion_type: PieceType::None };
+            return Err(());
         }
 
-        m
+        Ok(m)
     }
+
+    type Err = ();
 }
 
 impl LogMove {
     pub fn to_move(&self) -> Move {
-        return Move {
+        Move {
             origin_square: self.origin_square,
             destination_square: self.destination_square,
             promotion_type: self.promotion_type

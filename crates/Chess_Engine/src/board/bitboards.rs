@@ -9,20 +9,20 @@ impl Board {
     #[inline(always)]
     pub fn generate_pieces_bitboard(&mut self, white: bool) -> i64 {
         if white {
-            if self.white_pieces_bitboard.is_some() {
-                return self.white_pieces_bitboard.unwrap();
+            if let Some(bitboard) = self.white_pieces_bitboard {
+                return bitboard;
             }
         } else {
-            if self.black_pieces_bitboard.is_some() {
-                return self.black_pieces_bitboard.unwrap();
+            if let Some(bitboard) = self.black_pieces_bitboard {
+                return bitboard;
             }
         }
 
         let mut bitboard: i64 = 0;
 
-        for i in 0..64 {
-            if self.squares[i].is_some() {
-                bitboard = bitboard | ((self.squares[i].unwrap().white_piece == white) as i64) << i;
+        for (i, square) in self.squares.iter().enumerate() {
+            if let Some(square) = square {
+                bitboard |= ((square.white_piece == white) as i64) << i;
             }
         }
 
@@ -100,7 +100,7 @@ impl Board {
 
     #[inline(always)]
     pub fn get_check_block_bitboard(&mut self, white: bool) -> i64 {
-        if self.check() == false {
+        if !self.check() {
             return 0;
         }
 
@@ -148,7 +148,6 @@ impl Board {
             self.white_orthogonal_pin_bitboard.is_some() && self.black_orthogonal_pin_bitboard.is_some() &&
             self.white_diagonal_pin_bitboard.is_some() && self.black_diagonal_pin_bitboard.is_some() &&
             self.white_check_block_bitboard.is_some() && self.black_check_block_bitboard.is_some() {
-            //println!("Early return");
             return;
         }
 
@@ -182,10 +181,10 @@ impl Board {
                             }
 
                             if p.white_piece {
-                                white_attack_bitboard |= 1 << I + DIR_INDEX_TO_OFFSET[dir];
+                                white_attack_bitboard |= 1 << (I + DIR_INDEX_TO_OFFSET[dir]);
                             }
                             else {
-                                black_attack_bitboard |= 1 << I + DIR_INDEX_TO_OFFSET[dir];
+                                black_attack_bitboard |= 1 << (I + DIR_INDEX_TO_OFFSET[dir]);
                             }
                         }
                     }
@@ -228,7 +227,7 @@ impl Board {
                                     break;
                                 }
 
-                                potential_bitboard |= 1 << I + offset;
+                                potential_bitboard |= 1 << (I + offset);
 
                                 if pin_detection_stage == 0 {
                                     if p.white_piece {
@@ -254,15 +253,15 @@ impl Board {
                                             if pin_detection_stage == 1 {
                                                 if (DIR_INDEX_TO_OFFSET[dir] % 8).abs() + (DIR_INDEX_TO_OFFSET[dir] / 8).abs() == 1 {
                                                     if p.white_piece {
-                                                        black_orthogonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
+                                                        black_orthogonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << (I + offset));
                                                     } else {
-                                                        white_orthogonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
+                                                        white_orthogonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << (I + offset));
                                                     }
                                                 } else {
                                                     if p.white_piece {
-                                                        black_diagonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
+                                                        black_diagonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << (I + offset));
                                                     } else {
-                                                        white_diagonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
+                                                        white_diagonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << (I + offset));
                                                     }
                                                 }
 
@@ -399,7 +398,7 @@ impl Board {
                                     break;
                                 }
 
-                                potential_bitboard |= 1 << I + offset;
+                                potential_bitboard |= 1 << (I + offset);
 
                                 if pin_detection_stage == 0 {
                                     if p.white_piece {
@@ -425,15 +424,15 @@ impl Board {
                                             if pin_detection_stage == 1 {
                                                 if (DIR_INDEX_TO_OFFSET[dir] % 8).abs() + (DIR_INDEX_TO_OFFSET[dir] / 8).abs() == 1 {
                                                     if p.white_piece {
-                                                        black_orthogonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
+                                                        black_orthogonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << (I + offset));
                                                     } else {
-                                                        white_orthogonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
+                                                        white_orthogonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << (I + offset));
                                                     }
                                                 } else {
                                                     if p.white_piece {
-                                                        black_diagonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
+                                                        black_diagonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << (I + offset));
                                                     } else {
-                                                        white_diagonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
+                                                        white_diagonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << (I + offset));
                                                     }
                                                 }
 
@@ -513,10 +512,6 @@ impl Board {
                                             } else {
                                                 white_en_passant_pin_bitboard |= potential_bitboard;
                                             }
-                                            // }
-                                            // else {
-                                            //     en_passant_pin_stage = -2;
-                                            // }
                                         } else {
                                             en_passant_pin_stage = -2;
                                         }
@@ -538,7 +533,7 @@ impl Board {
                             let mut pin_detection = false;
 
                             for _ in 0..self.distance_to_edge[i as usize][dir] {
-                                potential_bitboard |= 1 << I + offset;
+                                potential_bitboard |= 1 << (I + offset);
 
                                 if self.squares[(I + offset) as usize].is_some() {
                                     if !square_contains!(self, I + offset, !p.white_piece, PieceType::King) {
@@ -561,15 +556,15 @@ impl Board {
                                         if pin_detection {
                                             if (DIR_INDEX_TO_OFFSET[dir] % 8).abs() + (DIR_INDEX_TO_OFFSET[dir] / 8).abs() == 1 {
                                                 if p.white_piece {
-                                                    black_orthogonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
+                                                    black_orthogonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << (I + offset));
                                                 } else {
-                                                    white_orthogonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
+                                                    white_orthogonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << (I + offset));
                                                 }
                                             } else {
                                                 if p.white_piece {
-                                                    black_diagonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
+                                                    black_diagonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << (I + offset));
                                                 } else {
-                                                    white_diagonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << I + offset);
+                                                    white_diagonal_pin_bitboard |= potential_bitboard | (1 << i) ^ (1 << (I + offset));
                                                 }
                                             }
 
@@ -605,9 +600,9 @@ impl Board {
                             }
 
                             if p.white_piece {
-                                white_attack_bitboard |= 1 << I + KNIGHT_JUMP_OFFSETS[dir];
+                                white_attack_bitboard |= 1 << (I + KNIGHT_JUMP_OFFSETS[dir]);
                             } else {
-                                black_attack_bitboard |= 1 << I + KNIGHT_JUMP_OFFSETS[dir];
+                                black_attack_bitboard |= 1 << (I + KNIGHT_JUMP_OFFSETS[dir]);
                             }
 
                             if self.squares[(I + KNIGHT_JUMP_OFFSETS[dir]) as usize].is_some() {
@@ -615,16 +610,16 @@ impl Board {
                                     check_number += 1;
 
                                     if p.white_piece {
-                                        black_check_block_bitboard |= (1 << I + KNIGHT_JUMP_OFFSETS[dir]) | (1 << i);
+                                        black_check_block_bitboard |= (1 << (I + KNIGHT_JUMP_OFFSETS[dir])) | (1 << i);
                                     } else {
-                                        white_check_block_bitboard |= (1 << I + KNIGHT_JUMP_OFFSETS[dir]) | (1 << i);
+                                        white_check_block_bitboard |= (1 << (I + KNIGHT_JUMP_OFFSETS[dir])) | (1 << i);
                                     }
                                 }
                             }
                         }
                     }
                     PieceType::Pawn => {
-                        if i < 8 || i > 55 {
+                        if !(8..=55).contains(&i) {
                             continue;
                         }
 
@@ -632,31 +627,31 @@ impl Board {
 
                         if i % 8 != 0 {
                             if p.white_piece {
-                                white_attack_bitboard |= 1 << row_in_front - 1;
+                                white_attack_bitboard |= 1 << (row_in_front - 1);
                             } else {
-                                black_attack_bitboard |= 1 << row_in_front - 1;
+                                black_attack_bitboard |= 1 << (row_in_front - 1);
                             }
 
                             if square_contains!(self, row_in_front - 1, !p.white_piece, PieceType::King) {
                                 if p.white_piece {
-                                    black_check_block_bitboard |= (1 << row_in_front - 1) | (1 << i);
+                                    black_check_block_bitboard |= (1 << (row_in_front - 1)) | (1 << i);
                                 } else {
-                                    white_check_block_bitboard |= (1 << row_in_front - 1) | (1 << i);
+                                    white_check_block_bitboard |= (1 << (row_in_front - 1)) | (1 << i);
                                 }
                             }
                         }
                         if i % 8 != 7 {
                             if p.white_piece {
-                                white_attack_bitboard |= 1 << row_in_front + 1;
+                                white_attack_bitboard |= 1 << (row_in_front + 1);
                             } else {
-                                black_attack_bitboard |= 1 << row_in_front + 1;
+                                black_attack_bitboard |= 1 << (row_in_front + 1);
                             }
 
                             if square_contains!(self, row_in_front + 1, !p.white_piece, PieceType::King) {
                                 if p.white_piece {
-                                    black_check_block_bitboard |= (1 << row_in_front + 1) | (1 << i);
+                                    black_check_block_bitboard |= (1 << (row_in_front + 1)) | (1 << i);
                                 } else {
-                                    white_check_block_bitboard |= (1 << row_in_front + 1) | (1 << i);
+                                    white_check_block_bitboard |= (1 << (row_in_front + 1)) | (1 << i);
                                 }
                             }
                         }

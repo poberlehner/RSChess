@@ -12,7 +12,7 @@ impl Board {
                     if legal_moves[i] == legal_moves[j] {
                         eprintln!("Move duplicate: {} -> {}",Self::square_index_to_chars(legal_moves[i].origin_square).iter().collect::<String>(),
                             Self::square_index_to_chars(legal_moves[j].destination_square).iter().collect::<String>());
-                        warn!("Move duplicate {} in Position \"{}\"", legal_moves[i].to_string(), self.generate_fen());
+                        warn!("Move duplicate {} in Position \"{}\"", legal_moves[i], self.generate_fen());
                     }
                 }
             }

@@ -70,9 +70,8 @@ impl Renderer
     ///
     /// returns: [Texture2D; 12]
     ///     the textures for each piece (all white pieces then black) Pawn, Knight, Bishop, Rook, Queen, King
-    ///
     pub fn load_piece_textures(raylib_handle: &mut RaylibHandle, raylib_thread: &RaylibThread, texture_atlas_path: String, size: u32) -> [Texture2D; 12] {
-        let texture_atlas = Image::load_image(&texture_atlas_path).expect(format!("Could not load texture atlas from {texture_atlas_path}").as_str());
+        let texture_atlas = Image::load_image(&texture_atlas_path).expect("Could not load texture atlas from {texture_atlas_path}");
 
         let mut buf_image1;
         buf_image1 = texture_atlas.clone();

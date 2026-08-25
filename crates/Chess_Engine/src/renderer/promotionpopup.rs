@@ -15,14 +15,12 @@ pub(crate) struct PromotionPopup
 impl PromotionPopup
 {
     pub fn new(position: Vector2, size: Vector2, white: bool, bg_color: Color) -> Self {
-        let promotionpopup = PromotionPopup {
+        PromotionPopup {
             position,
             size,
             bg_color,
             white
-        };
-
-        promotionpopup
+        }
     }
 
     pub fn draw(&self, draw_handle: &mut RaylibDrawHandle, textures: &[Texture2D; 12]) {

@@ -25,7 +25,7 @@ impl Piece {
     }
 
     pub fn to_char(&self) -> char {
-        return match self.piece_type {
+        match self.piece_type {
             PieceType::King => { if self.white_piece { 'K' } else { 'k' } }
             PieceType::Queen => { if self.white_piece { 'Q' } else { 'q' } }
             PieceType::Rook => { if self.white_piece { 'R' } else { 'r' } }
@@ -37,7 +37,7 @@ impl Piece {
     }
 
     pub fn to_char_uppercase(&self) -> char {
-        return match self.piece_type {
+        match self.piece_type {
             PieceType::King => { 'K' }
             PieceType::Queen => { 'Q' }
             PieceType::Rook => { 'R' }

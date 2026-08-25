@@ -4,7 +4,7 @@ use crate::board::{Board, r#move::KNIGHT_JUMP_OFFSETS};
 
 impl Board {
     pub(super) fn precompute_distance_to_edge_data(&mut self) {
-        for i in 0..64 {
+        for (i, distance_to_edge) in self.distance_to_edge.iter_mut().enumerate() {
             let x = i % 8;
             let y = i / 8;
 
@@ -13,7 +13,7 @@ impl Board {
             let south_num = y;
             let west_num = x;
 
-            self.distance_to_edge[i] = [
+            *distance_to_edge = [
                 north_num as u8,
                 east_num as u8,
                 south_num as u8,
@@ -29,22 +29,22 @@ impl Board {
     pub(super) fn precompute_knight_jump_legality(&mut self) {
         self.knight_jump_legality = [[true; 8]; 64];
 
-        for i in 0..64 {
-            for dir in 0..8 {
-                let x = i % 8;
-                let y = i / 8;
+        for (i, knight_jump_legality) in self.knight_jump_legality.iter_mut().enumerate() {
+            for (dir, offset) in KNIGHT_JUMP_OFFSETS.iter().enumerate() {
+                let x = i as i32 % 8;
+                let y = i as i32 / 8;
 
-                let new_x = (i + KNIGHT_JUMP_OFFSETS[dir]) % 8;
-                let new_y = (i + KNIGHT_JUMP_OFFSETS[dir]) / 8;
+                let new_x = (i as i32 + offset) % 8;
+                let new_y = (i as i32 + offset) / 8;
 
                 let total_diff = x.abs_diff(new_x) + y.abs_diff(new_y);
 
                 if total_diff != 3 {
-                    self.knight_jump_legality[i as usize][dir] = false;
+                    knight_jump_legality[dir] = false;
                 }
 
-                if i + KNIGHT_JUMP_OFFSETS[dir] < 0 || i + KNIGHT_JUMP_OFFSETS[dir] > 63 {
-                    self.knight_jump_legality[i as usize][dir] = false;
+                if i as i32 + offset < 0 || i as i32 + offset > 63 {
+                    knight_jump_legality[dir] = false;
                 }
             }
         }

@@ -26,14 +26,14 @@ use chess_bot::bot::Bot;
 use chess_engine::bot::ChessBot;
 
 fn custom_panic_hook(panic_info: &PanicHookInfo) {
-    if let Ok(mut log_file) = OpenOptions::new().append(true).create(true).write(true).open("assets/Chess.log") {
+    if let Ok(mut log_file) = OpenOptions::new().append(true).create(true).open("assets/Chess.log") {
 
-        log_file.write("[PANIC] ".as_ref()).expect("Failed to write to log file");
+        log_file.write_all("[PANIC] ".as_ref()).expect("Failed to write to log file");
 
          let time = Local::now();
          let time_str = time.to_string();
 
-         log_file.write(["[".as_bytes(), time_str.as_bytes(), "] : ".as_bytes(),
+         log_file.write_all(["[".as_bytes(), time_str.as_bytes(), "] : ".as_bytes(),
              panic_info.payload_as_str().expect("Failed to get panic info as string").as_bytes(), "\n".as_bytes()]
              .concat().as_ref()).expect("Failed to write to log file");
      }
@@ -55,6 +55,7 @@ pub struct BotController {
     bot: Bot
 }
 
+#[allow(clippy::collapsible_if)]
 impl BotController {
     pub fn new() -> BotController {
         let mut bot_controller = Self::initialize_context();
@@ -143,30 +144,28 @@ impl BotController {
 
             if !allow_moving && self.board.get_game_result() == GameResult::InProgress && self.bot_thread.is_none() {
                 let mut bot_board = self.board.clone();
-                let mut bot_copy = self.bot.clone();
+                let mut bot_copy = self.bot;
                 self.bot_thread = Some(spawn(move || -> Move {
                     bot_copy.get_best_move(&mut bot_board)
                 }));
             }
 
-            if self.bot_thread.is_some() {
-                if self.bot_thread.as_ref().unwrap().is_finished() {
-                    let m = self.bot_thread.take().unwrap().join();
+            if self.bot_thread.is_some() && self.bot_thread.as_ref().unwrap().is_finished() {
+                let m = self.bot_thread.take().unwrap().join();
 
-                    if m.is_err() {
-                        panic::resume_unwind(m.unwrap_err());
-                    }
-
-                    self.board.make_move(m.unwrap(), false);
-
-                    if self.board.get_game_result_simplified() != -1 {
-                        let competitors = if self.bot_color_white { ("Human", "RSChess Bot") } else { ("RSChess Bot", "Human") };
-                        self.board.save_game(String::from("assets/Games.pgn"),
-                            Some("RSChess Human vs. Bot"), Some(competitors), None);
-                    }
-
-                    self.bot_thread = None;
+                if let Err(err) = m {
+                    panic::resume_unwind(err);
                 }
+
+                self.board.make_move(m.unwrap(), false);
+
+                if self.board.get_game_result_simplified() != -1 {
+                    let competitors = if self.bot_color_white { ("Human", "RSChess Bot") } else { ("RSChess Bot", "Human") };
+                    self.board.save_game(String::from("assets/Games.pgn"),
+                        Some("RSChess Human vs. Bot"), Some(competitors), None);
+                }
+
+                self.bot_thread = None;
             }
 
             self.draw(allow_moving);
@@ -183,7 +182,7 @@ impl BotController {
 
             if self.board.get_game_result() == GameResult::InProgress && self.bot_thread.is_none() {
                 let mut bot_board = self.board.clone();
-                let mut bot_copy = self.bot.clone();
+                let mut bot_copy = self.bot;
                 self.bot_thread = Some(spawn(move || -> Move {
                     bot_copy.get_best_move(&mut bot_board)
                 }));
@@ -196,18 +195,16 @@ impl BotController {
                 self.board.start_game(TimeControl::Unlimited);
             }
 
-            if self.bot_thread.is_some() {
-                if self.bot_thread.as_ref().unwrap().is_finished() {
-                    let m = self.bot_thread.take().unwrap().join();
+            if self.bot_thread.is_some() && self.bot_thread.as_ref().unwrap().is_finished() {
+                let m = self.bot_thread.take().unwrap().join();
 
-                    if m.is_err() {
-                        panic::resume_unwind(m.unwrap_err());
-                    }
-
-                    self.board.make_move(m.unwrap(), false);
-
-                    self.bot_thread = None;
+                if let Err(err) = m {
+                    panic::resume_unwind(err);
                 }
+
+                self.board.make_move(m.unwrap(), false);
+
+                self.bot_thread = None;
             }
 
             self.draw(false);
@@ -232,7 +229,7 @@ impl BotController {
 
         self.renderer.draw_board(&mut draw_handle);
 
-        self.renderer.draw_pieces(&mut self.board, &mut draw_handle);
+        self.renderer.draw_pieces(&self.board, &mut draw_handle);
         self.renderer.draw_moves(&mut self.board, Color { r: 128, g: 128, b: 128, a: 155}, None, &mut draw_handle);
 
         self.renderer.draw_keyboard_shortcut_tips(&mut self.board, &mut draw_handle);
@@ -253,5 +250,11 @@ impl Drop for BotController {
         info!("Average frame times: {avg}s");
 
         self.renderer.unload_textures();
+    }
+}
+
+impl Default for BotController {
+    fn default() -> Self {
+        Self::new()
     }
 }
