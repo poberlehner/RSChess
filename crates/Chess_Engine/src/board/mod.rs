@@ -7,7 +7,7 @@ mod bitboards;
 mod generalapi;
 pub mod piece;
 mod tests;
-mod zobrist;
+pub mod zobrist;
 mod precomputation;
 
 use chrono::{DateTime, Local};

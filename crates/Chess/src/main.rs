@@ -1,5 +1,6 @@
 use std::{fs::File, io::Write};
 use bot_controller::bot_controller::BotController;
+use env_logger::Env;
 use log::*;
 use uci_engine::UCIController;
 
@@ -8,24 +9,24 @@ fn main() {
     if let Err(e) = log_file.write("\n".as_bytes()) {
         eprintln!("Failed to write to log file \"assets/Chess.log\" with error {e}");
     }
-    env_logger::Builder::new().target(env_logger::Target::Pipe(Box::new(log_file))).filter_level(log::LevelFilter::Trace).init();
+    env_logger::Builder::new().target(env_logger::Target::Pipe(Box::new(log_file))).parse_env(Env::default().default_filter_or("info")).init();
 
     let mut arguments: Vec<String> = std::env::args().collect();
     arguments.remove(0);
 
     if arguments.len() >= 1 {
-        match arguments.remove(0).as_str() {
+        match arguments[0].as_str() {
             "gui" => {
                 let mut app: BotController = BotController::new();
 
-                if arguments.len() == 0 {
+                if arguments.len() == 1 {
                     info!("Running default gui bot vs. bot");
                     app.run_bot_vs_bot();
 
                     return;
                 }
 
-                match arguments[0].as_str() {
+                match arguments[1].as_str() {
                     "botvbot" => {
                         app.run_bot_vs_bot();
                     }
@@ -37,7 +38,7 @@ fn main() {
                     }
                     _ => {
                         println!("Invalid argument after gui ");
-                        error!("Invalid argument after \"Chess gui \": {}", arguments[0]);
+                        error!("Invalid argument after \"Chess gui \": {}", arguments[1]);
                     }
                 }
             }
@@ -47,7 +48,7 @@ fn main() {
             }
             _ => {
                 println!("Invalid argument\nValid arguments are: gui, uci");
-                error!("Invalid command line argument");
+                error!("Invalid command line argument: {}", arguments[0]);
             }
         }
     }
