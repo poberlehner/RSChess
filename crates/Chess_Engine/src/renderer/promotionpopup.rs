@@ -2,7 +2,7 @@ use raylib::ffi::MouseButton::MOUSE_BUTTON_LEFT;
 use raylib::prelude::*;
 use crate::board::piece::PieceType;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) struct PromotionPopup
 {
     pub(crate) position: Vector2,
@@ -24,6 +24,9 @@ impl PromotionPopup
     }
 
     pub fn draw(&self, draw_handle: &mut RaylibDrawHandle, textures: &[Texture2D; 12]) {
+        //White: Queen, Rook, Knight, Bishop
+        static TEXTUREINDICES: [i32; 4] = [4, 3, 1, 2];
+
         let texture_scale: f32 = self.size.x / textures[0].height as f32;
 
         draw_handle.draw_rectangle_rounded(
@@ -34,15 +37,14 @@ impl PromotionPopup
             5,
             self.bg_color);
 
-        //These are for the white pieces, apply an offset of 6 for the black ones
-        //Queen, Rook, Knight, Bishop
-        static INDICES: [i32; 4] = [4, 3, 1, 2];
         for i in 0..4 {
-            draw_handle.draw_texture_ex(&textures[(INDICES[i] + (!self.white as i32 * 6)) as usize], Vector2 { x: self.position.x, y: self.position.y + (self.size.y / 4f32) * i as f32 }, 0f32, texture_scale, Color::WHITE);
+            draw_handle.draw_texture_ex(&textures[(TEXTUREINDICES[i] + (!self.white as i32 * 6)) as usize],
+                Vector2 { x: self.position.x, y: (self.size.y / 4f32).mul_add(i as f32, self.position.y) },
+                0f32, texture_scale, Color::WHITE);
         }
     }
 
-    pub fn update(&mut self, rl: &mut RaylibHandle) -> Option<PieceType> {
+    pub fn update(&self, rl: &RaylibHandle) -> Option<PieceType> {
         if rl.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) {
             let mouse_pos = rl.get_mouse_position();
 

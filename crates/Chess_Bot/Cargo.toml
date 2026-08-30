@@ -6,3 +6,6 @@ edition = "2024"
 [dependencies]
 chess_engine = { path = "../Chess_Engine" }
 log = "0.4.33"
+
+[lints]
+workspace = true

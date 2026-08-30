@@ -5,18 +5,16 @@ use chess_engine::board::{
     utilities::TimeControl
 };
 use chrono::prelude::*;
-use log::*;
+use log::{error, info};
 use raylib::core::RaylibHandle;
 use raylib::ffi::{GetRandomValue, GuiControl::DEFAULT, GuiDefaultProperty::TEXT_SIZE};
 use raylib::prelude::*;
 use raylib::prelude::TraceLogLevel;
 use std::{
-    env,
     fs::*,
     io::Write,
     panic,
     panic::PanicHookInfo,
-    path::PathBuf,
     thread::{JoinHandle, spawn},
     time::Instant
 };
@@ -25,6 +23,7 @@ use chess_engine::renderer::Renderer;
 use chess_bot::bot::Bot;
 use chess_engine::bot::ChessBot;
 
+#[allow(clippy::expect_used, clippy::unwrap_used)]
 fn custom_panic_hook(panic_info: &PanicHookInfo) {
     if let Ok(mut log_file) = OpenOptions::new().append(true).create(true).open("assets/Chess.log") {
 
@@ -33,10 +32,15 @@ fn custom_panic_hook(panic_info: &PanicHookInfo) {
          let time = Local::now();
          let time_str = time.to_string();
 
-         log_file.write_all(["[".as_bytes(), time_str.as_bytes(), "] : ".as_bytes(),
-             panic_info.payload_as_str().expect("Failed to get panic info as string").as_bytes(), "\n".as_bytes()]
-             .concat().as_ref()).expect("Failed to write to log file");
+         let panic_str = ["[".as_bytes(), time_str.as_bytes(), "] : ".as_bytes(),
+             panic_info.payload_as_str().unwrap_or("Invalid panic payload").as_bytes(), "\n".as_bytes()];
+
+         log_file.write_all(panic_str.concat().as_ref()).expect("Failed to write to log file");
+
+         eprintln!("[PANIC] {}", str::from_utf8(panic_str.concat().as_ref()).expect("Invalid utf8 sequence"))
      }
+
+     error!("Failed to open log file");
 }
 
 pub struct BotController {
@@ -79,16 +83,20 @@ impl BotController {
 
         panic::set_hook(Box::new(custom_panic_hook));
 
-        Self::initialize_working_directory();
-
         rl.set_target_fps(120);
         info!("Window creation took {}ms", start_time.elapsed().as_millis());
 
         let board = Board::new();
 
-        let renderer = Renderer::new(&mut rl, &thread, "assets/Pieces.png".parse().unwrap(),
-            130,Color { r: 171, g: 121, b: 101, a: 255 },
+        let mut renderer = Renderer::new(130,Color { r: 171, g: 121, b: 101, a: 255 },
             Color { r: 238, g: 216, b: 192, a: 255});
+
+        let texture_load_result = renderer.load_piece_textures(&mut rl, &thread, "assets/Pieces.png".parse().unwrap(), 334);
+
+        if let Err(err) = texture_load_result {
+            error!("Failed to load piece textures from file \"assets/Pieces.png\" with error {err}");
+
+        }
 
         BotController {
             raylib_handle: rl,
@@ -104,22 +112,6 @@ impl BotController {
             bot_color_white: true,
 
             bot: Bot::new()
-        }
-    }
-
-    fn initialize_working_directory() {
-        let current_directory = env::current_dir();
-
-        if let Ok(mut working_dir) = current_directory {
-            while !(exists(working_dir.join(PathBuf::from("assets"))).is_ok() && exists(working_dir.join(PathBuf::from("assets"))).unwrap()) {
-                working_dir.pop();
-            }
-
-            env::set_current_dir(working_dir).expect("Failed to set current working directory");
-        }
-        else {
-            error!("Failed to get current working directory");
-            error!("This might cause assets, logs or other files to not be loaded or saved correctly");
         }
     }
 
@@ -150,22 +142,12 @@ impl BotController {
                 }));
             }
 
-            if self.bot_thread.is_some() && self.bot_thread.as_ref().unwrap().is_finished() {
-                let m = self.bot_thread.take().unwrap().join();
+            self.handle_bot_thread_finished();
 
-                if let Err(err) = m {
-                    panic::resume_unwind(err);
-                }
-
-                self.board.make_move(m.unwrap(), false);
-
-                if self.board.get_game_result_simplified() != -1 {
-                    let competitors = if self.bot_color_white { ("Human", "RSChess Bot") } else { ("RSChess Bot", "Human") };
-                    self.board.save_game(String::from("assets/Games.pgn"),
-                        Some("RSChess Human vs. Bot"), Some(competitors), None);
-                }
-
-                self.bot_thread = None;
+            if self.board.get_game_result_simplified() != -1 {
+                let competitors = if self.bot_color_white { ("Human", "RSChess Bot") } else { ("RSChess Bot", "Human") };
+                self.board.save_game(String::from("assets/Games.pgn"),
+                    Some("RSChess Human vs. Bot"), Some(competitors), None);
             }
 
             self.draw(allow_moving);
@@ -188,23 +170,13 @@ impl BotController {
                 }));
             }
 
+            self.handle_bot_thread_finished();
+
             if self.board.get_game_result_simplified() != -1 {
                 self.board.save_game(String::from("assets/Games.pgn"),
                     Some("RSChess Bot vs. Bot"), Some(("RSChess Bot", "RSChess Bot")), None);
                 self.board.load_fen(STARTFEN);
                 self.board.start_game(TimeControl::Unlimited);
-            }
-
-            if self.bot_thread.is_some() && self.bot_thread.as_ref().unwrap().is_finished() {
-                let m = self.bot_thread.take().unwrap().join();
-
-                if let Err(err) = m {
-                    panic::resume_unwind(err);
-                }
-
-                self.board.make_move(m.unwrap(), false);
-
-                self.bot_thread = None;
             }
 
             self.draw(false);
@@ -220,6 +192,27 @@ impl BotController {
             }
 
             self.draw(true);
+        }
+    }
+
+    fn handle_bot_thread_finished(&mut self) {
+        if self.bot_thread.is_none() { return }
+
+        #[allow(clippy::unwrap_used)]
+        if self.bot_thread.as_ref().unwrap().is_finished() {
+            #[allow(clippy::unwrap_used)]
+            let m = self.bot_thread.take().unwrap().join();
+
+            match m {
+                Err(err) => {
+                    panic::resume_unwind(err);
+                }
+                Ok(m) => {
+                    self.board.make_move(m, false);
+                }
+            }
+
+            self.bot_thread = None;
         }
     }
 
@@ -249,6 +242,8 @@ impl Drop for BotController {
         let avg = sum / self.frame_times.len() as f32;
         info!("Average frame times: {avg}s");
 
+        // The textures have to be unloaded before RaylibHandle because it unloads all loaded textures when dropped
+        // If the textures themselves are dropped after they will try to unload themselves leading to a double free in the underlying C code
         self.renderer.unload_textures();
     }
 }

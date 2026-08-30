@@ -19,7 +19,7 @@ use crate::board::r#move::LogMove;
 use crate::board::utilities::TimeControl;
 use zobrist::Zobrist;
 
-#[derive(Clone, PartialEq)]
+#[derive(Eq, PartialEq, Clone)]
 pub struct Board {
     pub(super) squares: [Option<Piece>; 64],
 

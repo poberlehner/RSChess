@@ -4,11 +4,11 @@ use crate::board::Board;
 use crate::board::piece::PieceType;
 use crate::board::utilities::TimeControl;
 use crate::renderer::Renderer;
+use log::warn;
 use raylib::prelude::*;
 
 impl Renderer {
     pub fn draw_board(&mut self, draw_handle: &mut RaylibDrawHandle) {
-        self.textures.as_ref().expect("Textures are not properly loaded");
         let offset = draw_handle.get_render_width() - self.square_size as i32 * 8;
 
         for y in 0..8 {
@@ -26,7 +26,13 @@ impl Renderer {
     }
 
     pub fn draw_pieces(&mut self, board: &Board, draw_handle: &mut RaylibDrawHandle) {
+        if self.textures.is_none() {
+            warn!("Tried to draw while the piece textures are not loaded");
+            return;
+        }
+
         for (i, square) in board.squares.iter().enumerate() {
+            #[allow(clippy::unwrap_used)]
             if let Some(square) = square {
                 if let Some(selection) = self.selected_square && self.active_selection {
                     if selection == i as u8 {
@@ -47,6 +53,7 @@ impl Renderer {
 
         if let Some(selection) = self.selected_square && self.active_selection {
             if let Some(piece) = board.squares[selection as usize] {
+                #[allow(clippy::unwrap_used)]
                 let texture: &Texture2D =
                     &self.textures.as_ref().unwrap()
                         [(piece.piece_type as usize - 1) +
@@ -75,7 +82,13 @@ impl Renderer {
 
     //Draws the moves of the selected piece when moves is None
     pub fn draw_moves(&mut self, board: &mut Board, color: Color, moves: Option<Vec<Move>>, draw_handle: &mut RaylibDrawHandle) {
+        if self.textures.is_none() {
+            warn!("Tried to draw moves while the textures are not laoded");
+            return;
+        }
+
         if let Some(popup) = self.promotion_popup {
+            #[allow(clippy::unwrap_used)]
             popup.draw(draw_handle, self.textures.as_ref().unwrap());
         }
 
@@ -85,15 +98,13 @@ impl Renderer {
                     (self.square_index_to_pos(draw_handle, m.destination_square as i32).y + (self.square_size as i32 / 2) as f32) as i32, self.square_size as f32 / 8.0, color);
             }
         }
-        else {
-            if let Some(selection) = self.selected_square {
-                let moves = board.get_legal_moves_for_square(selection);
+        else if let Some(selection) = self.selected_square {
+            let moves = board.get_legal_moves_for_square(selection);
 
-                for m in moves {
-                    if m.promotion_type == PieceType::None || m.promotion_type == PieceType::Pawn {
-                        draw_handle.draw_circle((self.square_index_to_pos(draw_handle, m.destination_square as i32).x + (self.square_size / 2) as f32) as i32,
-                            (self.square_index_to_pos(draw_handle, m.destination_square as i32).y + (self.square_size / 2) as f32) as i32, self.square_size as f32 / 8.0, color);
-                    }
+            for m in moves {
+                if m.promotion_type == PieceType::None || m.promotion_type == PieceType::Pawn {
+                    draw_handle.draw_circle((self.square_index_to_pos(draw_handle, m.destination_square as i32).x + (self.square_size / 2) as f32) as i32,
+                        (self.square_index_to_pos(draw_handle, m.destination_square as i32).y + (self.square_size / 2) as f32) as i32, self.square_size as f32 / 8.0, color);
                 }
             }
         }
@@ -108,6 +119,7 @@ impl Renderer {
             _ => {
                 draw_handle.draw_text(format!("Checkmate: {}", board.checkmate() as i32).as_str(),
                     20, 80, 20, Color::WHITE);
+                #[allow(clippy::unwrap_used)]
                 draw_handle.draw_text(format!("Number of Moves: {}", board.get_legal_moves().as_ref().unwrap().len()).as_str(),
                     20, 110, 20, Color::WHITE);
                 draw_handle.draw_text("Press R to flip the board", 20, 50, 20, Color::WHITE);

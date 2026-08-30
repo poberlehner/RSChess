@@ -19,7 +19,7 @@ pub enum Direction {
 pub static DIR_INDEX_TO_OFFSET: [i32; 8] = [8, 1, -8, -1, 9, -7, -9, 7];
 pub static KNIGHT_JUMP_OFFSETS: [i32; 8] = [17, 15, 10, 6, -6, -10, -15, -17];
 
-#[derive(PartialEq, Clone, Copy, Debug)]
+#[derive(Eq, PartialEq, Clone, Copy, Debug)]
 pub struct Move {
     pub origin_square: u8,
     pub destination_square: u8,
@@ -27,7 +27,7 @@ pub struct Move {
     pub promotion_type: PieceType,
 }
 
-#[derive(PartialEq, Clone, Copy, Debug)]
+#[derive(Eq, PartialEq, Clone, Copy, Debug)]
 pub struct LogMove {
     pub origin_square: u8,
     pub destination_square: u8,
@@ -78,7 +78,7 @@ impl FromStr for Move {
 
         if !Board::valid_file_char(chars[0]) || !Board::valid_file_char(chars[2]) {
             warn!("Invalid file char in move string \"{string}\"");
-            return Err(())
+            return Err(format!("Invalid file char in move string \"{string}\""));
         }
 
         m.origin_square = Board::file_char_to_index(chars[0]) as u8 + (chars[1].to_digit(10).unwrap_or(0) - 1) as u8 * 8;
@@ -88,14 +88,14 @@ impl FromStr for Move {
         }
 
         if m.origin_square >= 8 || m.destination_square >= 8 {
-            error!("Invalid input to Move::from_str: {}", string);
-            return Err(());
+            error!("Invalid input to Move::from_str: {string}");
+            return Err(format!("Invalid input to Move::from_str: {string}"));
         }
 
         Ok(m)
     }
 
-    type Err = ();
+    type Err = String;
 }
 
 impl LogMove {

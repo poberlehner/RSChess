@@ -1,29 +1,10 @@
-#![allow(unused)]
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 use chess_engine::board::utilities::TimeControl;
 use criterion::{criterion_group, criterion_main, Criterion};
 use std::env;
 use std::fs::exists;
 use std::path::PathBuf;
 use chess_engine::board::Board;
-
-fn bench_board_fn(board: &mut Board) {
-    board.get_legal_moves();
-
-    board.invalidate_caches();
-}
-
-fn move_generation_bench(c: &mut Criterion) {
-    let mut board = Board::new();
-
-    let mut group = c.benchmark_group("Move generation");
-
-    group.noise_threshold(0.02);
-    group.confidence_level(0.90);
-    group.sample_size(50000);
-    group.measurement_time(core::time::Duration::from_secs(5));
-    group.bench_function("Move generation", |b| b.iter(|| bench_board_fn(&mut board)));
-    group.finish();
-}
 
 pub fn move_generation_recursive_bench(c: &mut Criterion) {
     let current_directory = env::current_dir();
@@ -47,8 +28,8 @@ pub fn move_generation_recursive_bench(c: &mut Criterion) {
 
     group.noise_threshold(0.02);
     group.confidence_level(0.90);
-    group.sample_size(100000);
-    group.measurement_time(core::time::Duration::from_secs(80));
+    group.sample_size(20000);
+    group.measurement_time(core::time::Duration::from_secs(9));
     group.bench_function("Move generation", |b| b.iter(|| recursive_move_generation_bench(&mut board, DEPTH)));
 }
 

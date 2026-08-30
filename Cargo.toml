@@ -9,3 +9,38 @@ debug = 0
 [profile.test]
 opt-level = 3
 debug = false
+
+[workspace.lints.clippy]
+debug_assert_with_mut_call = "deny"
+assigning_clones = "warn"
+branches_sharing_code = "warn"
+cloned_instead_of_copied = "warn"
+cognitive_complexity = "warn"
+too_many_lines = "warn"
+comparison_chain = "warn"
+decimal_bitwise_operands = "warn"
+default_trait_access = "warn"
+derive_partial_eq_without_eq = "warn"
+enum_glob_use = "warn"
+expect_used = "warn"
+unwrap_used = "warn"
+explicit_iter_loop = "warn"
+large_stack_frames = "warn"
+needless_collect = "warn"
+needless_pass_by_ref_mut = "warn"
+needless_type_cast = "warn"
+redundant_clone = "warn"
+suboptimal_flops = "warn"
+fallible_impl_from = "warn"
+filetype_is_file = "warn"
+float_cmp = "warn"
+float_cmp_const = "warn"
+format_push_string = "warn"
+ignore_without_reason = "warn"
+implicit_clone = "warn"
+imprecise_flops = "warn"
+inefficient_to_string = "warn"
+items_after_statements = "warn"
+large_digit_groups = "warn"
+
+multiple_crate_versions = "warn"

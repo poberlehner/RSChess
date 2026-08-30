@@ -3,7 +3,7 @@ use std::str::FromStr;
 use std::thread::JoinHandle;
 use chess_engine::board::{Board, STARTFEN, r#move::Move, utilities::TimeControl};
 use chess_bot::bot::Bot;
-use log::warn;
+use log::{warn, error};
 
 #[allow(unused)]
 pub struct UCIController {
@@ -42,12 +42,13 @@ impl UCIController {
             command.pop();
 
             if let Err(e) = result {
-                eprintln!("IO Error encountered: {}", e);
+                eprintln!("IO Error encountered: {e}");
+                error!("IO Error encountered: {e}");
                 return;
             }
 
             let cmd_copy = command.clone();
-            let mut commands = cmd_copy.split_whitespace().collect::<Vec<&str>>();
+            let commands = cmd_copy.split_whitespace().collect::<Vec<&str>>();
 
             match commands[0] {
                 "uci" => { println!("uciok"); }
@@ -57,10 +58,10 @@ impl UCIController {
                     self.board.start_game(TimeControl::Unlimited);
                 }
                 "position" => {
-                    self.process_position_cmd(&mut commands);
+                    self.process_position_cmd(&commands);
                 }
                 "go" => {
-                    self.process_go_cmd(&mut commands);
+                    self.process_go_cmd(&commands);
                 }
                 "stop" => {
                     eprintln!("RSChess cannot stop its search early yet");
@@ -75,7 +76,7 @@ impl UCIController {
         }
     }
 
-    fn process_position_cmd(&mut self, commands: &mut [&str]) {
+    fn process_position_cmd(&mut self, commands: &[&str]) {
         //TODO: Test
         let mut move_index = 2;
         if commands[1] == "fen" {
@@ -100,22 +101,31 @@ impl UCIController {
         self.board.start_game(TimeControl::Unlimited);
 
         while move_index < commands.len() {
+            let m = Move::from_str(commands[move_index]);
 
-            self.board.make_move(Move::from_str(commands[move_index]).expect(""), false);
-            move_index += 1;
+            match m {
+                Ok(m) => {
+                    self.board.make_move(m, false);
+                    move_index += 1;
+                }
+                Err(err) => {
+                    warn!("Failed to parse move \"{}\" with error: {err}", commands[move_index]);
+                    return;
+                }
+            }
         }
     }
 
     #[allow(unused)]
-    fn process_go_cmd(&mut self, commands: &mut [&str]) {
+    fn process_go_cmd(&mut self, commands: &[&str]) {
         todo!();
 
         match commands[1] {
             "infinite" => {
-                
+
             }
             "depth" => {
-                
+
             }
             _ => {}
         }

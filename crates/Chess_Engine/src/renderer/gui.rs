@@ -57,13 +57,19 @@ impl Renderer {
             return;
         }
 
-        if !((mouse_pos.x > board_offset) && (mouse_pos.x < (board_offset + self.square_size as f32 * 8.0) && mouse_pos.y < self.square_size as f32 * 8.0)) {
+        if !((mouse_pos.x > board_offset) && (mouse_pos.x < (self.square_size as f32).mul_add(8.0, board_offset) && mouse_pos.y < self.square_size as f32 * 8.0)) {
             self.selected_square = None;
             self.active_selection = false;
             return;
         }
 
+        #[allow(clippy::unwrap_used)]
         if self.promotion_popup.is_some() {
+            if self.promotion_move.is_none() {
+                error!("Promotion popup exists while promotion_move does not");
+                error!("Promotion popup: {:?}", self.promotion_popup.unwrap());
+                return
+            }
             let promotion_type = self.promotion_popup.unwrap().update(rl);
 
             if let Some(promotion_type) = promotion_type {
@@ -86,6 +92,7 @@ impl Renderer {
             return;
         }
 
+        #[allow(clippy::unwrap_used)]
         if self.selected_square.is_some() && !self.active_selection {
             let square: u8 = self.mouse_pos_to_square_index_rl(rl) as u8;
             let moves = board.get_legal_moves_for_square(self.selected_square.unwrap());
@@ -113,6 +120,7 @@ impl Renderer {
         }
     }
 
+    #[allow(clippy::unwrap_used)]
     fn handle_mouse_button_release(&mut self, board: &mut Board, rl: &mut RaylibDrawHandle) {
         let square: u8 = self.mouse_pos_to_square_index_rl(rl) as u8;
 
@@ -134,26 +142,32 @@ impl Renderer {
             if moves.contains(&current_move) {
                 let position = self.square_index_to_pos_rl(rl, current_move.origin_square as i32);
 
-                self.promotion_popup = Some(PromotionPopup::new(
-                    position,
-                    Vector2::new(60f32, 240f32),
-                    board.squares[current_move.origin_square as usize]
-                        .expect("No piece at the origin of a move (Renderer)").white_piece,
-                    Color::WHITE
-                ));
+                let square = board.squares[current_move.origin_square as usize];
 
-                current_move.promotion_type = PieceType::None;
-                self.promotion_move = Some(current_move);
+                if let Some(piece) = square {
 
-                self.selected_square = None;
-                self.active_selection = false;
+                    self.promotion_popup = Some(PromotionPopup::new(
+                        position,
+                        Vector2::new(60f32, 240f32),
+                        piece.white_piece,
+                        Color::WHITE
+                    ));
+
+                    current_move.promotion_type = PieceType::None;
+                    self.promotion_move = Some(current_move);
+                    self.selected_square = None;
+                    self.active_selection = false;
+                }
+                else {
+                    warn!("No piece of the origin of the promoting move");
+                }
             }
         }
 
         self.active_selection = false;
     }
 
-    fn handle_gui_buttons(&mut self, board: &mut Board, rl: &mut RaylibDrawHandle) {
+    fn handle_gui_buttons(&self, board: &Board, rl: &mut RaylibDrawHandle) {
         let pressed = rl.gui_label_button(self.pgn_print_button, "Get PGN");
 
         if pressed {

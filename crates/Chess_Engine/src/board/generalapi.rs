@@ -6,8 +6,9 @@ use crate::board::r#move::{LogMove, Move};
 use crate::board::Board;
 use crate::board::utilities::TimeControl;
 use std::cmp::max;
+use std::io::Write;
 use std::time::*;
-use std::io::prelude::*;
+use std::fmt::Write as _;
 
 //Main api functions
 impl Board {
@@ -28,6 +29,7 @@ impl Board {
             self.get_legal_moves();
         }
 
+        #[allow(clippy::unwrap_used)]
         if !self.legal_moves.as_ref().unwrap().contains(&m) {
             println!("Position: {}", self.generate_fen());
             println!("The Move: {m} is not legal");
@@ -50,6 +52,7 @@ impl Board {
             }
         }
 
+        #[allow(clippy::unwrap_used)]
         let mut current_logmove: LogMove = LogMove {
             origin_square: m.origin_square,
             destination_square: m.destination_square,
@@ -80,8 +83,8 @@ impl Board {
             }
 
             //Reset on pawn move
-            if self.squares[m.origin_square as usize]
-                .expect("No piece at the Origin of the Move").piece_type == PieceType::Pawn {
+            #[allow(clippy::unwrap_used)]
+            if self.squares[m.origin_square as usize].unwrap().piece_type == PieceType::Pawn {
                 self.game_state.fifty_move_counter = 0;
             }
 
@@ -105,19 +108,27 @@ impl Board {
                     error!("Promotion type of move {m} is set to king in position \"{}\"", self.generate_fen());
                     panic!("Invalid promotion type");
                 }
-                if self.squares[m.origin_square as usize]
-                    .unwrap().piece_type != PieceType::Pawn {
-                    error!("Promotion type of move {m} is set even though the move originates from {:?}",
-                            self.squares[m.origin_square as usize].unwrap().piece_type);
-                    panic!("invalid promotion type");
+                match self.squares[m.origin_square as usize] {
+                    Some(piece) => {
+                        if piece.piece_type != PieceType::Pawn {
+                            error!("Promotion type of move {m} is set even though the move originates from {:?}", piece.piece_type);
+                            panic!("invalid promotion type");
+                        }
+                    }
+                    None => {
+                        error!("No piece at the origin of the move {m} in position {}", self.generate_fen());
+                        error!("PGN: {}", self.get_pgn(None, None, None));
+                        panic!("Invalid move");
+                    }
                 }
             }
 
             current_logmove.captured_piece = self.squares [m.destination_square as usize];
-            self.squares [m.destination_square as usize] =
+            self.squares[m.destination_square as usize] =
                 Some(Piece { piece_type: m.promotion_type,
+            #[allow(clippy::unwrap_used)]
                     white_piece: self.squares [m.origin_square as usize].unwrap().white_piece});
-            self.squares [m.origin_square as usize] = None;
+            self.squares[m.origin_square as usize] = None;
         }
         else //Special move handling
         {
@@ -130,12 +141,13 @@ impl Board {
             if !special_move {
                 current_logmove.captured_piece = self.squares [m.destination_square as usize];
 
-                self.squares [m.destination_square as usize] =
+                self.squares[m.destination_square as usize] =
                     self.squares [m.origin_square as usize];
-                self.squares [m.origin_square as usize] = None;
+                self.squares[m.origin_square as usize] = None;
             }
 
-            if self.squares [m.destination_square as usize].unwrap().piece_type == PieceType::King {
+            #[allow(clippy::unwrap_used)]
+            if self.squares[m.destination_square as usize].unwrap().piece_type == PieceType::King {
                 if self.game_state.white_to_move {
                     self.white_king_pos = m.destination_square;
                 }
@@ -170,12 +182,14 @@ impl Board {
 
         self.game_state.white_to_move = !self.game_state.white_to_move;
 
+        #[allow(clippy::unwrap_used)]
         let last = self.move_log.pop().unwrap();
 
         if last.null_move {
             return Some(last);
         }
 
+        #[allow(clippy::expect_used, reason = "Performance")]
         let piece = self.squares[last.destination_square as usize].expect("Invalid logged move");
 
         if !in_search {
@@ -355,23 +369,20 @@ impl Board {
 
         for (number, m) in (1i32..).zip(self.move_log.iter()) {
             if number % 2 == 1 {
-                result.push_str(&format!("{}. ", (number as f32 / 2.0).ceil()));
+                let _ = write!(result, "{}. ", (number as f32 / 2.0).ceil());
             }
 
             let move_str = board.log_move_to_string(*m);
 
             board.make_move(m.to_move(), false);
 
+            result.push_str(&move_str);
+
             if board.checkmate() {
-                result.push_str(&move_str);
                 result.push('#');
             }
             else if board.check() {
-                result.push_str(&move_str);
                 result.push('+');
-            }
-            else {
-                result.push_str(&move_str);
             }
 
             result.push(' ');
@@ -399,24 +410,22 @@ impl Board {
 
         result.push_str("[Site \"RSChess\"]\n");
 
-        result.push_str(&format!("[Date \"{}.{}.{}\"]\n",
-            self.game_start_time.year(), self.game_start_time.month(), self.game_start_time.day()));
-        result.push_str(&format!("[Time \"{}:{}:{}\"]\n",
-            self.game_start_time.hour(), self.game_start_time.minute(), self.game_start_time.second()));
+        let _ = writeln!(result, "[Date \"{}.{}.{}\"]", self.game_start_time.year(), self.game_start_time.month(), self.game_start_time.day());
+        let _ = writeln!(result, "[Time \"{}:{}:{}\"]", self.game_start_time.hour(), self.game_start_time.minute(), self.game_start_time.second());
 
-        result.push_str(&format!("[FEN \"{}\"]\n", self.start_fen));
+        let _ = writeln!(result, "[FEN \"{}\"]", self.start_fen);
 
         match self.time_control {
             TimeControl::Unlimited => { }
             TimeControl::Limited(time, increment) => {
-                result.push_str(&format!("[TimeControl \"{}+{:.1}\"]\n", time.as_secs(), increment.as_secs_f32()));
+                let _ = writeln!(result, "[TimeControl \"{}+{:.1}\"]", time.as_secs(), increment.as_secs_f32());
             }
         }
 
-        result.push_str(&format!("[Round \"{}\"]\n", round.unwrap_or("?")));
+        let _ = writeln!(result, "[Round \"{}\"]", round.unwrap_or("?"));
 
-        result.push_str(&format!("[White \"{}\"]\n", competitors.unwrap_or(("-", "-")).0));
-        result.push_str(&format!("[Black \"{}\"]\n", competitors.unwrap_or(("-", "-")).1));
+        let _ = writeln!(result, "[White \"{}\"]", competitors.unwrap_or(("-", "-")).0);
+        let _ = writeln!(result, "[Black \"{}\"]", competitors.unwrap_or(("-", "-")).1);
 
         if self.get_game_result_simplified() != -1 {
             result.push_str("[Result \"");
@@ -445,7 +454,9 @@ impl Board {
             return;
         }
 
+        #[allow(clippy::unwrap_used)]
         let mut pgn_file = pgn_file.unwrap();
+
         let pgn = self.get_pgn(event, competitors, round);
 
         if let Err(err) = pgn_file.write(pgn.as_bytes()) {
@@ -480,6 +491,7 @@ impl Board {
 //Main API helper functions
 impl Board {
     fn handle_castling(&mut self, m: Move, log_move: &mut LogMove) -> bool {
+        #[allow(clippy::unwrap_used)]
         if self.squares[m.origin_square as usize].is_some() &&
             self.squares[m.origin_square as usize].unwrap().piece_type == PieceType::King {
             if self.game_state.castling_rights[0] {
@@ -586,6 +598,7 @@ impl Board {
     }
 
     fn handle_en_passant(&mut self, m: Move, log_move: &mut LogMove) -> bool {
+        #[allow(clippy::unwrap_used)]
         if self.squares[m.origin_square as usize].is_some() &&
             self.squares[m.origin_square as usize].unwrap().piece_type == PieceType::Pawn {
 
@@ -595,7 +608,7 @@ impl Board {
                 return false;
             }
 
-            //If en passant is played
+            #[allow(clippy::unwrap_used)]
             if self.game_state.en_passant_square.is_some() && m.destination_square == self.game_state.en_passant_square.unwrap() {
                 self.squares[(self.game_state.en_passant_square.unwrap() as i32 + if log_move.moved_piece.white_piece { -8i32 } else { 8 }) as usize] = None;
 
@@ -630,14 +643,21 @@ impl Board {
 
         self.test_duplicate_moves();
 
-        let moves = self.get_legal_moves().as_ref().expect("Failed to get legal moves");
+        #[allow(clippy::unwrap_used)]
+        let moves = self.get_legal_moves().as_ref().unwrap();
 
         let mut file_eq_count = 0;
         let mut rank_eq_count = 0;
         let mut pawn_eq_count = 0;
         let mut eq_count = 0;
 
-        for m_local in moves.clone().iter() {
+        for m_local in moves.clone() {
+            if self.squares[m_local.origin_square as usize].is_none() {
+                warn!("Invalid log move cannot be turned into a string");
+                return "".to_string();
+            }
+
+            #[allow(clippy::unwrap_used)]
             let moved_piece = self.squares[m_local.origin_square as usize].unwrap();
             if m_local.destination_square == m.destination_square {
 
@@ -652,12 +672,13 @@ impl Board {
                     }
                 }
 
-                if m.moved_piece.piece_type == PieceType::Pawn && self.squares[m_local.origin_square as usize].unwrap().piece_type == PieceType::Pawn {
+                if m.moved_piece.piece_type == PieceType::Pawn && moved_piece.piece_type == PieceType::Pawn {
                     pawn_eq_count += 1;
                 }
             }
         }
 
+        #[allow(clippy::unwrap_used)]
         if m.moved_piece.piece_type != PieceType::Pawn {
             str.push(m.moved_piece.to_char_uppercase());
 
@@ -669,17 +690,16 @@ impl Board {
                 str.push(char::from_digit(m.origin_square as u32 / 8 + 1, 10).unwrap());
             }
         }
-        else {
-            if pawn_eq_count >= 2 || (m.captured_piece.is_some() && m.captured_piece.unwrap().piece_type != PieceType::None) || m.en_passant {
-                str.push(Self::file_index_to_char(m.origin_square as i32 % 8));
-            }
+        else if pawn_eq_count >= 2 || (m.captured_piece.is_some() && m.captured_piece.unwrap().piece_type != PieceType::None) || m.en_passant {
+            str.push(Self::file_index_to_char(m.origin_square as i32 % 8));
         }
 
+        #[allow(clippy::unwrap_used)]
         if m.captured_piece.is_some() && m.captured_piece.unwrap().piece_type != PieceType::None  {
             str.push('x')
         }
 
-        str.push_str(&format!("{}{}", Self::file_index_to_char(m.destination_square as i32 % 8), m.destination_square / 8 + 1));
+        let _ = write!(str, "{}{}", Self::file_index_to_char(m.destination_square as i32 % 8), m.destination_square / 8 + 1);
 
         if m.promotion_type != PieceType::None {
             str.push('=');
@@ -700,22 +720,22 @@ impl Board {
         if self.checkmate() {
             if self.game_state.white_to_move {
                 self.game_result = GameResult::WhiteIsMated;
+
                 if !in_search {
                     println!("{blue}White Is Mated{reset}");
                     info!("White is mated");
                 }
-
-                return;
             }
             else {
                 self.game_result = GameResult::BlackIsMated;
+
                 if !in_search {
                     println!("{blue}Black Is Mated{reset}");
                     info!("Black is mated");
                 }
-
-                return;
             }
+
+            return;
         }
 
         //Handle repetition
@@ -757,6 +777,7 @@ impl Board {
         }
 
         //Handle Stalemate
+        #[allow(clippy::unwrap_used)]
         if self.get_legal_moves().as_ref().unwrap().is_empty() {
             self.game_result = GameResult::Stalemate;
             if !in_search {
@@ -772,29 +793,27 @@ impl Board {
         let mut knight_num: i32 = 0;
         let mut opp_pieces: i32 = 0;
 
-        for square in self.squares.iter() {
-            if square.is_some() {
-                if square.unwrap().white_piece == white {
-                    if insufficient_piece {
-                        return false;
-                    }
+        for piece in self.squares.iter().flatten() {
+            if piece.white_piece == white {
+                if insufficient_piece {
+                    return false;
+                }
 
-                    match square.unwrap().piece_type {
-                        PieceType::Bishop => { insufficient_piece = true; }
-                        PieceType::Knight => {
-                            knight_num += 1;
+                match piece.piece_type {
+                    PieceType::Bishop => { insufficient_piece = true; }
+                    PieceType::Knight => {
+                        knight_num += 1;
 
-                            if knight_num == 2 {
-                                insufficient_piece = true;
-                            }
+                        if knight_num == 2 {
+                            insufficient_piece = true;
                         }
-                        PieceType::King => { }
-                        _ => { return false; }
                     }
+                    PieceType::King => { }
+                    _ => { return false; }
                 }
-                else {
-                    opp_pieces += 1;
-                }
+            }
+            else {
+                opp_pieces += 1;
             }
         }
 
@@ -803,39 +822,36 @@ impl Board {
 
     //Returns true if there is time left
     fn handle_time(&mut self) -> bool {
-        match self.time_control {
-            TimeControl::Limited(_, increment) => {
-                let blue = "\x1b[34m";     // Blue text
-                let reset = "\x1b[0m";     // Reset to default
+        if let TimeControl::Limited(_, increment) = self.time_control {
+            let blue = "\x1b[34m";     // Blue text
+            let reset = "\x1b[0m";     // Reset to default
 
-                if self.game_state.white_to_move {
-                    if self.white_time_left <= self.move_start_time.elapsed() {
-                        self.white_time_left = Duration::new(0, 0);
-                        self.game_result = GameResult::WhiteTimeout;
-                        println!("{blue}Black won by white Timeout{reset}");
-                        info!("Black won by white Timeout");
-                        return false;
-                    }
-
-                    self.white_time_left -= self.move_start_time.elapsed();
-                    self.white_time_left += increment;
-                }
-                else {
-                    if self.black_time_left <= self.move_start_time.elapsed() {
-                        self.black_time_left = Duration::new(0, 0);
-                        self.game_result = GameResult::BlackTimeout;
-                        println!("{blue}White won by black Timeout{reset}");
-                        info!("White won by black Timeout");
-                        return false;
-                    }
-
-                    self.black_time_left -= self.move_start_time.elapsed();
-                    self.black_time_left += increment;
+            if self.game_state.white_to_move {
+                if self.white_time_left <= self.move_start_time.elapsed() {
+                    self.white_time_left = Duration::new(0, 0);
+                    self.game_result = GameResult::WhiteTimeout;
+                    println!("{blue}Black won by white Timeout{reset}");
+                    info!("Black won by white Timeout");
+                    return false;
                 }
 
-                true
+                self.white_time_left -= self.move_start_time.elapsed();
+                self.white_time_left += increment;
             }
-            _ => { true }
+            else {
+                if self.black_time_left <= self.move_start_time.elapsed() {
+                    self.black_time_left = Duration::new(0, 0);
+                    self.game_result = GameResult::BlackTimeout;
+                    println!("{blue}White won by black Timeout{reset}");
+                    info!("White won by black Timeout");
+                    return false;
+                }
+
+                self.black_time_left -= self.move_start_time.elapsed();
+                self.black_time_left += increment;
+            }
         }
+
+        true
     }
 }

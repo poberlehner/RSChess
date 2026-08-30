@@ -1,4 +1,4 @@
-#[derive(PartialEq, Copy, Clone)]
+#[derive(Eq, PartialEq, Copy, Clone)]
 pub struct GameState
 {
     pub white_to_move: bool,
@@ -10,7 +10,7 @@ pub struct GameState
     pub next_move_number: u32,
 }
 
-#[derive(PartialEq, Copy, Clone, Debug)]
+#[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub enum GameResult {
     NotStarted,
     InProgress,

@@ -4,7 +4,8 @@ use crate::board::Board;
 
 impl Board {
     pub fn test_duplicate_moves(&mut self) {
-        let legal_moves = self.get_legal_moves().as_ref().expect("Unable to get legal moves").clone();
+        #[allow(clippy::unwrap_used)]
+        let legal_moves = self.get_legal_moves().as_ref().unwrap().clone();
 
         for i in 0..legal_moves.len() {
             for j in 0..legal_moves.len() {
@@ -24,7 +25,7 @@ impl Board {
 
         let mut failure_count = 0;
 
-        for test_fen in test_fen_strings.iter() {
+        for test_fen in &test_fen_strings {
             let mut board = Board::new();
 
             board.load_fen(test_fen);

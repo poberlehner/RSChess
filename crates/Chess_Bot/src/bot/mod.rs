@@ -98,8 +98,12 @@ impl Bot {
         if depth == 0 {
             return self.evaluate(board);
         }
-
-        let moves = board.get_legal_moves().clone().unwrap();
+        
+        let moves = board.get_legal_moves().clone().unwrap_or_else(|| {
+            error!("Failed to get legal moves at search depth {}", DEPTH - depth);
+            panic!("Failed to get legal moves at search depth {}", DEPTH - depth);
+        });
+        
         let mut best_value = alpha;
         let mut best_move: Move = moves[0];
 
@@ -112,7 +116,10 @@ impl Bot {
                 value = -self.search(board, depth - 1, -beta, -best_value);
             }
 
-            board.undo_move(true).expect("Failed to undo move");
+            if board.undo_move(true).is_none() {
+                error!("Failed to undo move");
+                return best_value;
+            }
 
             if value > best_value {
                 best_value = value;
@@ -146,6 +153,7 @@ impl Bot {
                 continue;
             }
 
+            #[allow(clippy::unwrap_used)]
             let p = square.unwrap();
             let i_corr = if board.get_white_to_move() { i } else { 64 - i - 1 };
 

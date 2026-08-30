@@ -1,4 +1,4 @@
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub enum PieceType {
     None = 0,
     Pawn = 1,
@@ -9,7 +9,7 @@ pub enum PieceType {
     King = 6
 }
 
-#[derive(PartialEq, Copy, Clone, Debug)]
+#[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub struct Piece {
     pub piece_type: PieceType,
     pub white_piece: bool

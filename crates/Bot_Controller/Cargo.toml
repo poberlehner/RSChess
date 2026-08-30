@@ -9,3 +9,6 @@ chess_engine = { path = "../Chess_Engine" }
 chess_bot = { path = "../Chess_Bot" }
 chrono = "0.4.45"
 log = "0.4.33"
+
+[lints]
+workspace = true

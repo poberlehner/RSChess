@@ -7,3 +7,6 @@ edition = "2024"
 chess_engine = { path = "../Chess_Engine" }
 chess_bot    = { path = "../Chess_Bot"    }
 log          = "0.4.33"
+
+[lints]
+workspace = true

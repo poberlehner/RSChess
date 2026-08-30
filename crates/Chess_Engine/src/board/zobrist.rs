@@ -2,7 +2,7 @@ use rand::{RngExt, rngs::SmallRng};
 
 use crate::board::Board;
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(Eq, PartialEq, Clone, Copy)]
 pub struct Zobrist {
     pub square_nums: [[i64; 15]; 64],
 
@@ -20,17 +20,17 @@ impl Zobrist {
         let mut zobrist: Zobrist = Zobrist { square_nums: [[0; 15]; 64], castling_states_nums: [0; 16], en_passant: [0; 9], side_to_move: 0 };
         let mut rng: SmallRng = rand::make_rng();
 
-        for piece_nums in zobrist.square_nums.iter_mut() {
+        for piece_nums in &mut zobrist.square_nums {
             for num in piece_nums.iter_mut() {
                 *num = rng.random::<i64>();
             }
         }
 
-        for castling_state in zobrist.castling_states_nums.iter_mut() {
+        for castling_state in &mut zobrist.castling_states_nums {
             *castling_state = rng.random::<i64>();
         }
 
-        for en_passant_file in zobrist.en_passant.iter_mut() {
+        for en_passant_file in &mut zobrist.en_passant {
             *en_passant_file = rng.random::<i64>();
         }
 
