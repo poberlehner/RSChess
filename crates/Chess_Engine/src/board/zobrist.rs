@@ -1,3 +1,5 @@
+#[cfg(debug_assertions)]
+use log::trace;
 use rand::{RngExt, rngs::SmallRng};
 
 use crate::board::Board;
@@ -37,7 +39,7 @@ impl Zobrist {
         zobrist.side_to_move = rng.random::<i64>();
 
         #[cfg(debug_assertions)]
-        println!("Zobrist initialization time: {}µs", start_time.elapsed().as_micros());
+        trace!("Zobrist initialization time: {}µs", start_time.elapsed().as_micros());
 
         zobrist
     }

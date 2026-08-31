@@ -3,7 +3,7 @@ use std::str::FromStr;
 use std::thread::JoinHandle;
 use chess_engine::board::{Board, STARTFEN, r#move::Move, utilities::TimeControl};
 use chess_bot::bot::Bot;
-use log::{warn, error};
+use log::{trace, warn, error};
 
 #[allow(unused)]
 pub struct UCIController {
@@ -25,7 +25,7 @@ impl UCIController {
     }
 
     pub fn run(&mut self) {
-        println!("UCI engine RSChess is running");
+        trace!("UCI engine RSChess is running");
         let mut command = String::new();
         let mut result: Result<usize, io::Error>;
 
@@ -34,7 +34,8 @@ impl UCIController {
             print!("> ");
             let r = stdout().flush();
             if let Err(e) = r {
-                println!("Error while flushing stdout: {e}");
+                warn!("Error while flushing stdout: {e}");
+                continue;
             }
 
             command.clear();
@@ -42,9 +43,8 @@ impl UCIController {
             command.pop();
 
             if let Err(e) = result {
-                eprintln!("IO Error encountered: {e}");
                 error!("IO Error encountered: {e}");
-                return;
+                return
             }
 
             let cmd_copy = command.clone();
@@ -64,7 +64,6 @@ impl UCIController {
                     self.process_go_cmd(&commands);
                 }
                 "stop" => {
-                    eprintln!("RSChess cannot stop its search early yet");
                     warn!("RSChess cannot stop its search early yet");
                 }
                 "d" => {
@@ -118,7 +117,7 @@ impl UCIController {
 
     #[allow(unused)]
     fn process_go_cmd(&mut self, commands: &[&str]) {
-        todo!();
+        warn!("Not yet implemented");
 
         match commands[1] {
             "infinite" => {

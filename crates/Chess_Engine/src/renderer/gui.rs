@@ -171,7 +171,7 @@ impl Renderer {
         let pressed = rl.gui_label_button(self.pgn_print_button, "Get PGN");
 
         if pressed {
-            println!("{}", board.get_pgn(None, None, None));
+            info!("{}", board.get_pgn(None, None, None));
         }
     }
 }

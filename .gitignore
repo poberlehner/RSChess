@@ -1,5 +1,5 @@
 /target
 /.zed
 Cargo.lock
-/assets/Chess.log
-/assets/Games.pgn
+*.pgn
+*.log

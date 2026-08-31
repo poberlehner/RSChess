@@ -302,8 +302,7 @@ impl Board {
                 );
             }
             _ => {
-                eprintln!("PieceType on square ({}, {}) set to None", i % 8, i / 8);
-                warn!("PieceType on square {i} set to None");
+                warn!("PieceType on square {i} or {} set to None", Self::square_index_to_string(i));
             }
         }
     }
@@ -316,7 +315,7 @@ impl Board {
         white_check_block_bitboard: &mut i64, black_check_block_bitboard: &mut i64,
         white_diagonal_pin_bitboard: &mut i64, black_diagonal_pin_bitboard: &mut i64,
         white_orthogonal_pin_bitboard: &mut i64, black_orthogonal_pin_bitboard: &mut i64,
-        white_en_passant_pin_bitboard: &mut i64, black_en_passant_pin_bitboard: &mut i64) 
+        white_en_passant_pin_bitboard: &mut i64, black_en_passant_pin_bitboard: &mut i64)
     {
         for dir in dirs {
             let mut potential_bitboard: i64 = 0;

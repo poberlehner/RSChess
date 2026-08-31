@@ -11,8 +11,6 @@ impl Board {
             for j in 0..legal_moves.len() {
                 if i != j {
                     if legal_moves[i] == legal_moves[j] {
-                        eprintln!("Move duplicate: {} -> {}",Self::square_index_to_chars(legal_moves[i].origin_square).iter().collect::<String>(),
-                            Self::square_index_to_chars(legal_moves[j].destination_square).iter().collect::<String>());
                         warn!("Move duplicate {} in Position \"{}\"", legal_moves[i], self.generate_fen());
                     }
                 }
@@ -34,19 +32,15 @@ impl Board {
 
             if !result.eq(test_fen) {
                 failure_count += 1;
-                eprintln!("Input : {}", test_fen);
-                eprintln!("Result: {}", result);
                 warn!("Fen input : {}", test_fen);
                 warn!("Fen Result: {}", result);
             }
         }
 
         if failure_count > 0 {
-            println!("{} Test failed", failure_count);
-            warn!("{} Fen tests failed", failure_count);
+            warn!("{} of {} Fen tests failed", failure_count, test_fen_strings.len());
         }
         else {
-            println!("All fen tests succeeded");
             info!("All fen tests succeeded");
         }
     }

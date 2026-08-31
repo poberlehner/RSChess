@@ -95,7 +95,6 @@ impl BotController {
 
         if let Err(err) = texture_load_result {
             error!("Failed to load piece textures from file \"assets/Pieces.png\" with error {err}");
-
         }
 
         BotController {

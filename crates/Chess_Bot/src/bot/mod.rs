@@ -77,7 +77,7 @@ impl ChessBot for Bot {
     fn get_best_move(&mut self, board: &mut Board) -> Move {
         self.search(board, DEPTH, -99999999, 99999999);
 
-        println!("Node count: {}", self.node_count);
+        trace!("Node count: {}", self.node_count);
         self.node_count = 0;
 
         self.best_move
@@ -98,12 +98,12 @@ impl Bot {
         if depth == 0 {
             return self.evaluate(board);
         }
-        
+
         let moves = board.get_legal_moves().clone().unwrap_or_else(|| {
             error!("Failed to get legal moves at search depth {}", DEPTH - depth);
             panic!("Failed to get legal moves at search depth {}", DEPTH - depth);
         });
-        
+
         let mut best_value = alpha;
         let mut best_move: Move = moves[0];
 
@@ -132,7 +132,7 @@ impl Bot {
         }
 
         if DEPTH == depth {
-            println!("Best move: {}, value: {best_value}", self.best_move);
+            trace!("Best move: {}, value: {best_value}", self.best_move);
         }
 
         self.best_move = best_move;

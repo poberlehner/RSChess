@@ -16,8 +16,8 @@ impl Board {
     pub fn make_move(&mut self, m: Move, in_search: bool) -> bool {
         if self.game_result != GameResult::InProgress || ((in_search) &&
             (self.game_result == GameResult::Repetition || self.game_result == GameResult::FiftyMoveRule)) {
-            println!("The game is not running");
-            println!("Game Result: {:?}", self.game_result);
+            trace!("The game is not running");
+            trace!("Game Result: {:?}", self.game_result);
             warn!("Tried to make move {m} in position \"{}\" while the game result is {:?}", self.generate_fen(), self.game_result);
 
             self.move_log.push(LogMove::null_move());
@@ -31,8 +31,8 @@ impl Board {
 
         #[allow(clippy::unwrap_used)]
         if !self.legal_moves.as_ref().unwrap().contains(&m) {
-            println!("Position: {}", self.generate_fen());
-            println!("The Move: {m} is not legal");
+            trace!("Position: {}", self.generate_fen());
+            trace!("The Move: {m} is not legal");
 
             warn!("Tried to make move {m} in position \"{}\"", self.generate_fen());
 
@@ -43,7 +43,7 @@ impl Board {
 
         if !in_search {
             if !self.handle_time() {
-                println!("No time left");
+                trace!("No time left");
                 info!("Tried to make move {m} after timeout");
 
                 self.move_log.push(LogMove::null_move());
@@ -722,7 +722,6 @@ impl Board {
                 self.game_result = GameResult::WhiteIsMated;
 
                 if !in_search {
-                    println!("{blue}White Is Mated{reset}");
                     info!("White is mated");
                 }
             }
@@ -730,7 +729,6 @@ impl Board {
                 self.game_result = GameResult::BlackIsMated;
 
                 if !in_search {
-                    println!("{blue}Black Is Mated{reset}");
                     info!("Black is mated");
                 }
             }
@@ -753,7 +751,6 @@ impl Board {
                 self.game_result = GameResult::Repetition;
 
                 if !in_search {
-                    println!("{blue}Draw due to repetition{reset}");
                     info!("Draw due to repetition");
                 }
             }
@@ -762,7 +759,6 @@ impl Board {
         if self.game_state.fifty_move_counter == 100 {
             self.game_result = GameResult::FiftyMoveRule;
             if !in_search {
-                println!("{blue}Draw by the fifty-move rule{reset}");
                 info!("Draw by the fifty-move rule");
             }
         }
@@ -771,7 +767,6 @@ impl Board {
         if self.has_insufficient_material(true) && self.has_insufficient_material(false) {
             self.game_result = GameResult::InsufficientMaterial;
             if !in_search {
-                println!("{blue}Draw due to insufficient material{reset}");
                 info!("Draw due to insufficient material");
             }
         }
@@ -781,7 +776,6 @@ impl Board {
         if self.get_legal_moves().as_ref().unwrap().is_empty() {
             self.game_result = GameResult::Stalemate;
             if !in_search {
-                println!("{blue}Draw due to stalemate{reset}");
                 info!("Draw due to stalemate");
             }
         }
@@ -823,14 +817,10 @@ impl Board {
     //Returns true if there is time left
     fn handle_time(&mut self) -> bool {
         if let TimeControl::Limited(_, increment) = self.time_control {
-            let blue = "\x1b[34m";     // Blue text
-            let reset = "\x1b[0m";     // Reset to default
-
             if self.game_state.white_to_move {
                 if self.white_time_left <= self.move_start_time.elapsed() {
                     self.white_time_left = Duration::new(0, 0);
                     self.game_result = GameResult::WhiteTimeout;
-                    println!("{blue}Black won by white Timeout{reset}");
                     info!("Black won by white Timeout");
                     return false;
                 }
@@ -842,7 +832,6 @@ impl Board {
                 if self.black_time_left <= self.move_start_time.elapsed() {
                     self.black_time_left = Duration::new(0, 0);
                     self.game_result = GameResult::BlackTimeout;
-                    println!("{blue}White won by black Timeout{reset}");
                     info!("White won by black Timeout");
                     return false;
                 }
