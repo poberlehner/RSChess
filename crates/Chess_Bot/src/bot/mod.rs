@@ -1,6 +1,6 @@
 use log::*;
 use chess_engine::board::{r#move::Move, piece::PieceType};
-use chess_engine::bot::ChessBot;
+use crate::bot_trait::ChessBot;
 use chess_engine::board::Board;
 
 #[derive(Clone, Copy)]

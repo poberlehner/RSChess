@@ -1,7 +1,6 @@
 #![allow(clippy::collapsible_if)]
 pub mod board;
 pub mod renderer;
-pub mod bot;
 
 #[cfg(test)]
 mod tests {

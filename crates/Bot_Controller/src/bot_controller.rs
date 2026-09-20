@@ -20,8 +20,10 @@ use std::{
 };
 use chess_engine::board::Board;
 use chess_engine::renderer::Renderer;
-use chess_bot::bot::Bot;
-use chess_engine::bot::ChessBot;
+use chess_bot::{
+    bot::Bot,
+    bot_trait::ChessBot
+};
 
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 fn custom_panic_hook(panic_info: &PanicHookInfo) {
